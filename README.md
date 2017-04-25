@@ -4,6 +4,7 @@ This is a multiple object tracker with human label interface created by OpenCV a
 
 ## Version and Dependencies
 
+* OS: Windows 7
 * Python 3.5.2 
 * OpenCV 3.1.0
 * mahotas 1.4.3
