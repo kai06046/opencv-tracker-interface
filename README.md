@@ -1,6 +1,6 @@
 # tracker_by_opencv
 
-This is a multiple object tracking project for video by OpenCV and Python. Given with proper trained model, it can auto stop while the tracker lost the objects.
+This is a multiple object tracker with human label interface created by OpenCV and Python. Given with proper trained model, it can auto stop while the tracker lost the objects.
 
 ## Usage description
 Type 'python tracker.py' at command prompt and choose the video to initialze tracker by drawing target objects. The following are the current functions included while tracking:
