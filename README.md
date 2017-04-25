@@ -1,4 +1,4 @@
-# tracker_by_opencv
+# opencv-tracker-interface
 
 This is a multiple object tracker with human label interface created by OpenCV and Python. Given with proper trained model, it can auto stop while the tracker lost the objects.
 
