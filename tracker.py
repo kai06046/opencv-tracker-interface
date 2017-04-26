@@ -1,5 +1,4 @@
 # Usage: python tracker.py
-
 import os, cv2, timeit, sys
 import numpy as np
 from tkinter.filedialog import askopenfilename
@@ -12,14 +11,18 @@ import pickle
 WINDOW_NAME = 'Burying Beetle Tracker'
 OBJECT_NAME = 'beetle'
 FPS, FOURCC, RESOLUTION = 30, cv2.VideoWriter_fourcc(*'XVID'), (960, 720)
-FONT = cv2.FONT_HERSHEY_SIMPLEX
-COLOR = [(0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 255),
-         (255, 255, 0), (255, 0, 255), (255, 255, 255), (0, 0, 0)]
+FONT = cv2.FONT_HERSHEY_TRIPLEX
+COLOR = [(0, 255, 0), (255, 0, 0), (0, 0, 255), (0, 255, 255), (255, 255, 0), (255, 0, 255), (255, 255, 255), (0, 0, 0)]
 TRACK_ALGORITHM = 'MIL' # Other alternatives are BOOSTING, KCF, TLK, MEDIANFLOW 
+BAR_HEIGHT = 60
 RESIZE = (118, 88)
 
-# keyboard value
+# keyboard return value while it was pressed
 KEY_CONTINUE = ord(' ')
+KEY_ESC = 27
+KEY_ADD = ord('a')
+KEY_DELETE = ord('d')
+KEY_RETARGET = ord('r')
 KEY_LEFT = 2424832 # might different for different machine
 KEY_RIGHT = 2555904
 
@@ -32,14 +35,21 @@ vary = lambda x, var: x + np.random.randint(-var, var)
 def random_target(bbox, var = 10):
     x, y, w, h = bbox
     x1, y1, w1, h1 = vary(x, var), vary(y, var), vary(w, var), vary(h, var)
-    
     return x1, y1, w1, h1
 # get specific line from a text file
 def getlines(txt, n_line):
     with open(txt, 'r') as f:
         lines = f.readlines()
-
     return lines[n_line]
+# see if a points is inside a rectangle
+def in_rect(pt, rect):  
+    x_condition = pt[0] > rect[0][0] and pt[0] < rect[1][0]
+    y_condition = pt[1] > rect[0][1] and pt[1] < rect[1][1]
+    
+    if x_condition and y_condition:
+        return True
+    else:
+        return False
 
 # Define tracker class
 class Tracker:
@@ -89,9 +99,16 @@ class Tracker:
             self._model = pickle.load(open('model/beetle_resize_118_88_no_shape.dat', 'rb'))
         else:
             self._model = model
+        self._stop_obj = None
+        self._is_stop = None
         
     # mouse callback method
     def _mouse_ops(self, event, x, y, flags, param):
+        
+        if len(self._roi) != 0:
+            in_rect_click = True in [in_rect(self._mv_pt, rect) for rect in self._roi]
+        else:
+            in_rect_click = False
         
         # check if the left mouse button was clicked and whether is in drawing mode
         if (event == cv2.EVENT_LBUTTONDOWN or event == cv2.EVENT_LBUTTONDBLCLK) and self._drawing:
@@ -109,7 +126,6 @@ class Tracker:
         # check if the left mouse button was clicked, and whether is in init mode
         elif (event == cv2.EVENT_LBUTTONDOWN or event == cv2.EVENT_LBUTTONDBLCLK) and self._init:
             self._roi_pts = [(x, y)] # reset ROI points and record the starting coordinates
-            
         # check if the left mouse button was released and whether is in init mode
         elif (event == cv2.EVENT_LBUTTONUP) and self._init:
             self._roi_pts.append((x, y)) # record the ending (x, y) coordinates
@@ -124,7 +140,9 @@ class Tracker:
         # current mouse coordinate
         elif event == cv2.EVENT_MOUSEMOVE:
             self._mv_pt = (x, y) 
-
+        # check if the left mouse buttion was double clicked
+        elif event == cv2.EVENT_LBUTTONDBLCLK and self._delete_box and in_rect_click:
+            self._delete_box = False
         # scroll up or down to select index of object
         elif event == cv2.EVENT_MOUSEWHEEL and (self._drawing or self._delete_box):
             if flags < 0:
@@ -140,16 +158,42 @@ class Tracker:
                     self._n += 1
                 print('Current retarget object: %s' % int(self._n + 1))    
     
-    # draw bouding boxed method
+    # initial frame
+    def _init_frame(self):
+
+        self.frame = cv2.resize(self.frame, self.resolution)
+        # extend the height of frame
+        self.frame = cv2.copyMakeBorder(self.frame, 0, BAR_HEIGHT, 0, 0, cv2.BORDER_CONSTANT, value=self.color[7])
+        self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
+        # store original gray scale frame
+        self.orig_gray = self.frame.copy()
+        self.frame = cv2.cvtColor(self.frame, cv2.COLOR_GRAY2BGR)
+        # store original frame
+        self.orig_col = self.frame.copy()
+
+    # draw bouding boxed method         
     def _draw_bbox(self):
         
         # draw bounding boxes
-        for i, b in enumerate(self._roi):
-            cv2.rectangle(self.frame, b[0], b[1], self.color[i], 2)
-            cv2.putText(self.frame, '%s %s' % (self.object_name, int(i+1)), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], 2)
+        if not self._delete_box:
+            for i, b in enumerate(self._roi):
+                cv2.rectangle(self.frame, b[0], b[1], self.color[i], 2)
+                cv2.putText(self.frame, '%s %s' % (self.object_name, int(i+1)), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], 1)
+        else:
+            for i, b in enumerate(self._roi):
+                if in_rect(self._mv_pt, b):
+                    thickness = 4
+                    font_thick = 4
+                    self._n = i
+                else:
+                    thickness = 2
+                    font_thick = 1
+                cv2.rectangle(self.frame, b[0], b[1], self.color[i], thickness)
+                cv2.putText(self.frame, '%s %s' % (self.object_name, int(i+1)), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], font_thick)
         
-        cv2.putText(self.frame,'# %s' %int(self.count), (10,20), self.font, 0.7, (0,255,255), 1)
-        cv2.putText(self.frame,'# retarget %s' %self._n_retarget, (100, 20), self.font, 0.7, (0,255,255), 1)
+        cv2.putText(self.frame,'# %s/%s' % (int(self.count), int(self._frame_count)), (5, 745), self.font, 0.5, (0,255,255), 1)
+        cv2.putText(self.frame,'# retarget %s' %self._n_retarget, (5, 770), self.font, 0.5, (0,255,255), 1)
+        cv2.putText(self.frame, 'r (reset), a (add), d (delete), space (continue), esc (close)', (150, 770), self.font, 0.5, (0, 255, 255), 1)        
 
         # draw current labeling box
         if len(self._roi_pts) != 0:
@@ -173,6 +217,9 @@ class Tracker:
     
     # save img inside the bounding boxes (for training model)
     def _save_pos(self):
+
+        if not os.path.exists('pos'):
+            os.makedirs('pos')
 
         if self.count == 1:
             for f in os.listdir('pos'):
@@ -207,61 +254,181 @@ class Tracker:
                 print('This is strange!')
                 pass
 
+    # initial target
+    def _initial_target(self):
+
+        while True:
+            key_init = cv2.waitKey(1)
+            self.frame = self.orig_col.copy()
+            self._draw_bbox()
+            cv2.imshow(self.window_name, self.frame)
+            
+            if len(self._init_bbox) != 0:
+                self._bboxes = [(r[0][0], r[0][1], r[1][0] - r[0][0], r[1][1] - r[0][1]) for r in self._init_bbox]
+                self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
+            
+            self._draw_bbox()
+            if (self._len_bbox != len(self._init_bbox)):
+                ok = self.tracker.add(self.frame, self._bboxes[self._len_bbox])
+                self._len_bbox += 1
+
+            elif key_init == KEY_CONTINUE:
+                self._init = False
+                break
+
+    # retarget mode
+    def _retarget(self):
+
+        video = cv2.VideoCapture(self._video)
+        # reset retargeting object index to object 1
+        self._n = self._stop_obj[0] if self._is_stop else 0 
+        print('Scroll the mouse wheel to choose index of object that needs retargeting \n')
+        print('Current retarget object: %s' % int(self._n + 1))
+       
+        self._drawing = True
+        # looping the current frame until SPACE was pressed
+        while True:
+            key_reset = cv2.waitKey(1)
+            cv2.imshow(self.window_name, self.frame)
+
+            # break the loop if SPACE was pressed
+            if key_reset == KEY_CONTINUE:
+                self._drawing = False
+                self._n_retarget += 1
+                break
+            # back to previous frame is LEFT KEY was pressed
+            elif key_reset == KEY_LEFT:
+                if self.count > 1:
+                    self.count -= 1
+                else:
+                    print('Already the first frame!')
+                # read previous frame and obtain bounding boxes
+                video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
+                _, self.frame = video.read()
+                self._init_frame()
+                self._read_bboxes()
+            # go to next frame is RIGHT KEY was pressed
+            elif key_reset == KEY_RIGHT:
+                if self.count == self._frame_count:
+                    print('Already the last frame')
+                else:
+                    self.count += 1
+                # read next frame and obtain bounding boxes
+                video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
+                _, self.frame = video.read()
+                self._init_frame()
+                self._read_bboxes()
+            # if 'a' was pressed, enter add boudning box mode
+            elif key_reset == KEY_ADD:
+                self._drawing = False
+                self._add_bboxes()
+                break
+            # if 'd' was pressed, enter delete boudning box mode
+            elif key_reset == KEY_DELETE:
+                print(self._roi)
+                print(self._bboxes)
+                self._drawing = False
+                self._delete_bboxes()
+                break
+            # else just keep looping at current frame
+            else:
+                video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
+                _, self.frame = video.read()
+                self._init_frame()
+                cv2.putText(self.frame, 'Current retarget object: %s' % int(self._n + 1), (5,15), self.font, 0.5, (0,255,255), 1)
+                cv2.putText(self.frame, 'Retarget by drawing a new rectangle (change object by mousewheel)', (150, 745), self.font, 0.6, (153,255,51), 1)
+                if self._is_stop:
+                    string = "Detect that there is no beetle in bounding box %s!" %(self._stop_obj + 1)
+                    cv2.putText(self.frame, string, (5,40), self.font, 0.5, (0,255,255), 1)
+            # reset new ROI and draw bounding boxes
+            self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
+            self._draw_bbox()
+
+        # reinitialize multi tracker
+        self.tracker = cv2.MultiTracker(self.track_alg)
+        self.tracker.add(self.frame, tuple(self._bboxes))
+
     # add bounding box
-    def _add_bbox(self):
+    def _add_bboxes(self):
 
         self._init = True
         # update self._init_bbox to current frame ROI
         self._init_bbox = self._roi
+
         if self._init:
             # looping the current frame until SPACE was pressed
             while True:
+                self.frame = self.orig_col.copy()
                 self._bboxes = [(r[0][0], r[0][1], r[1][0] - r[0][0], r[1][1] - r[0][1]) for r in self._init_bbox]
                 self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
                 key_add = cv2.waitKey(1)
                 self._draw_bbox()
-                cv2.putText(self.frame, 'Draw rectangle to add new target and press SPACE to continue', (10,50), self.font, 0.8, (51,153,255), 1)
+                cv2.putText(self.frame, 'Draw a rectangle to add new target', (150, 745), self.font, 0.6, (153,255,51), 1)
                 cv2.imshow(self.window_name, self.frame)
                 if (self._len_bbox != len(self._init_bbox)):
                     self._bboxes = [(r[0][0], r[0][1], r[1][0] - r[0][0], r[1][1] - r[0][1]) for r in self._init_bbox]
                     ok = self.tracker.add(self.frame, self._bboxes[self._len_bbox]) # adding new bounding box
                     self._len_bbox += 1
-
+                # break the loop if SPACE was pressed
                 elif key_add == KEY_CONTINUE:
                     self._init = False
+                    self._n_retarget += 1
+                    break
+                # if 'r' was pressed, enter retarget boudning box mode
+                elif key_add == KEY_RETARGET:
+                    self._init = False
+                    self._retarget()
+                    break
+                # if 'd' was pressed, enter delete boudning box mode
+                elif key_add == KEY_DELETE:
+                    self._init = False
+                    self._delete_bboxes()
                     break
         # update ROI
         self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
 
     # delete bounding boxes
     def _delete_bboxes(self):
-        self._n = 0
         self._delete_box = True
-        # self.frame = self._draw_bbox(self.frame)
         while True:
             key_delete = cv2.waitKey(1)
-
-            if key_delete == KEY_CONTINUE:
+            if not self._delete_box:
+                self.frame = self.orig_col.copy()
+                # delete selected bounding box
+                self._bboxes = np.delete(self._bboxes, self._n, axis=0)
+                self._len_bbox -= 1
+                self._init_bbox.pop()
+                # reinitialize multi tracker
+                self.tracker = cv2.MultiTracker(self.track_alg)
+                self.tracker.add(self.frame, tuple(self._bboxes))
+                # update ROI
+                self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
+                # quit the delete mode
+                self._delete_box = False
+                self._n_retarget += 1
+                self._delete_box = True
+            # if 'r' was pressed, enter retarget boudning box mode
+            elif key_delete == KEY_RETARGET:
+                self._delete_box = False
+                self._retarget()
+                break
+            # if 'a' was pressed, enter add boudning box mode
+            elif key_delete == KEY_ADD:
+                self._delete_box = False
+                self._add_bboxes()
+                break
+            # break the loop if SPACE was pressed
+            elif key_delete == KEY_CONTINUE:
                 self._delete_box = False
                 break
             else:
                 self.frame = self.orig_col.copy()
 
             self._draw_bbox()
-            cv2.putText(self.frame, 'Current retarget object: %s' % int(self._n + 1), (270,20), self.font, 0.8, (0,255,255), 1)
-            cv2.putText(self.frame, 'Press SPACE to delete and continue tracking', (10,50), self.font, 0.8, (153,255,51), 1)
+            cv2.putText(self.frame, 'Current retarget object: %s' % int(self._n + 1), (5, 15), self.font, 0.5, (0,255,255), 1)
+            cv2.putText(self.frame, 'Double click the bounding box to delete', (150, 745), self.font, 0.6, (153,255,51), 1)
             cv2.imshow(self.window_name, self.frame)
-        # delete selected bounding box
-        self._bboxes = np.delete(self._bboxes, self._n, axis=0)
-        self._len_bbox -= 1
-        self._init_bbox.pop()
-
-        # reinitialize multi tracker
-        self.tracker = cv2.MultiTracker(self.track_alg)
-        self.tracker.add(self.frame, tuple(self._bboxes))
-        # update ROI
-        self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
-
+        
     # read x, y, width, height of bouding boxes of previous frame
     def _read_bboxes(self):
 
@@ -358,7 +525,7 @@ class Tracker:
         video = cv2.VideoCapture(self._video)
         self.file_name = self._video.split('\\')[-1]
         self.video_name = self.file_name.split('.')[0]
-        out = cv2.VideoWriter("tracked_%s" % self.file_name, self.fourcc, self.fps, self.resolution)
+        # out = cv2.VideoWriter("tracked_%s" % self.file_name, self.fourcc, self.fps, self.resolution)
         # exit if video not opend
         if not video.isOpened():
             print('Could not open video')
@@ -370,13 +537,13 @@ class Tracker:
         # setup up the window and mouse callback
         cv2.namedWindow(self.window_name)
         cv2.setMouseCallback(self.window_name, self._mouse_ops)
-        print('Instructions: \n')
-        print('Draw a rectange around the target objects using left mouse button. ')
-        print('Press space to start tracking. ')
-        print('After tracking begins,')
-        print('Press "r" key to retarget;')
-        print('Press "a" key to add bounding box;')
-        print('Press "d" key to delete bounding box. \n')
+        # print('Instructions: \n')
+        # print('Draw a rectange around the target objects using left mouse button. ')
+        # print('Press space to start tracking. ')
+        # print('After tracking begins,')
+        # print('Press "r" key to retarget;')
+        # print('Press "a" key to add bounding box;')
+        # print('Press "d" key to delete bounding box. \n')
         
         while True:
             # Read a new frame and wait for a keypress
@@ -387,101 +554,27 @@ class Tracker:
             if not ok:
                 break
             # resize the frame into 960 x 720
-            self.frame = cv2.resize(self.frame, self.resolution)
-            self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2GRAY)
-            self.orig_gray = self.frame.copy()
-            self.frame = cv2.cvtColor(self.frame, cv2.COLOR_GRAY2BGR)
-            self.orig_col = self.frame
+            self._init_frame()
             
             if len(self._roi) != 0:
                 self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
             
             # if this is init mode, let user targets the beetles
             if self._init:
-
-                while True:
-                    key_init = cv2.waitKey(1)
-                    self.frame = self.orig_col.copy()
-                    self._draw_bbox()
-                    cv2.imshow(self.window_name, self.frame)
-                    
-                    if len(self._init_bbox) != 0:
-                        self._bboxes = [(r[0][0], r[0][1], r[1][0] - r[0][0], r[1][1] - r[0][1]) for r in self._init_bbox]
-                        self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
-                    
-                    self._draw_bbox()
-                    if (self._len_bbox != len(self._init_bbox)):
-                        ok = self.tracker.add(self.frame, self._bboxes[self._len_bbox])
-                        self._len_bbox += 1
-
-                    elif key_init == KEY_CONTINUE:
-                        self._init = False
-                        break
+                self._initial_target()
             
-            is_stop, stop_obj = self._stop_or_continue()
-            # self._stop_to_continue_update()
+            # run stop model 
+            self._is_stop, self._stop_obj = self._stop_or_continue()
 
             # if 'r' was pressed or stop model return True, enter to retarget mode
-            if key == ord('r') or is_stop:
-            # if key == ord('r'):
-                # reset retargeting object index to object 1
-                self._n = stop_obj[0]
-                self._n_retarget += 1
-                print('Scroll the mouse wheel to choose index of object that needs retargeting \n')
-                print('Current retarget object: %s' % int(self._n + 1))
-               
-                self._drawing = True
-                # looping the current frame until SPACE was pressed
-                while True:
-                    key_reset = cv2.waitKey(1)
-                    cv2.imshow(self.window_name, self.frame)
-
-                    # break the loop if SPACE was pressed
-                    if key_reset == KEY_CONTINUE:
-                        self._drawing = False
-                        break
-                    # back to previous frame is LEFT KEY was pressed
-                    elif key_reset == KEY_LEFT:
-                        if self.count > 1:
-                            self.count -= 1
-                        else:
-                            print('Already the first frame!')
-                        # read previous frame and obtain bounding boxes
-                        video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
-                        _, self.frame = video.read()
-                        self._read_bboxes()
-                    # go to next frame is RIGHT KEY was pressed
-                    elif key_reset == KEY_RIGHT:
-                        if self.count == self._frame_count:
-                            print('Already the last frame')
-                        else:
-                            self.count += 1
-                        # read next frame and obtain bounding boxes
-                        video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
-                        _, self.frame = video.read()
-                        self._read_bboxes()
-                    # else just keep looping at current frame
-                    else:
-                        video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
-                        _, self.frame = video.read()
-                        cv2.putText(self.frame, 'Current retarget object: %s' % int(self._n + 1), (270,20), self.font, 0.8, (0,255,255), 1)
-                        cv2.putText(self.frame, 'Retarget by drawing new rectangle and press SPACE to continue', (10,80), self.font, 0.8, (0,255,255), 1)
-                        if is_stop:
-                            string = string = "Detect that there is no beetle in bounding box %s" %(stop_obj + 1)
-                            cv2.putText(self.frame, string, (10,50), self.font, 0.8, (0,255,255), 1)
-                    # reset new ROI and draw bounding boxes
-                    self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
-                    self._draw_bbox()
-
-                # reinitialize multi tracker
-                self.tracker = cv2.MultiTracker(self.track_alg)
-                self.tracker.add(self.frame, tuple(self._bboxes))
-            # if 'a' was pressed, entering add boudning box mode
-            elif key == ord('a'):
+            if key == KEY_RETARGET or self._is_stop:
+                self._retarget()
+            # if 'a' was pressed, enter add boudning box mode
+            elif key == KEY_ADD:
                 print('Draw rectangle using left mouse button to add new target object')
-                self._add_bbox()
-            # if 'd' was pressed, entering delete boudning box mode
-            elif key == ord('d'):
+                self._add_bboxes()
+            # if 'd' was pressed, enter delete boudning box mode
+            elif key == KEY_DELETE:
                 print('Scroll the mouse wheel to choose index of object that needs deleting (default is %s 1) \n' % (self.object_name))
                 self._delete_bboxes()
             # otherwise, update bounding boxes from tracker
@@ -490,22 +583,22 @@ class Tracker:
                 self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
             
             if ok:
+                self.frame = self.orig_col.copy()
                 # draw current frame
-                # self.frame = self._draw_bbox(self.frame)
                 self._draw_bbox()
                 # save image inside the bounding boxes
                 self._save_pos()
                 self._write_bboxes()
                 # write current frame to output video
-                out.write(self.frame)
+                # out.write(self.frame)
                 self.count += 1
             # Display result
             cv2.imshow(self.window_name, self.frame)
             
-            if key == 27: break
+            if key == KEY_ESC: break
             
         video.release()
-        out.release()
+        # out.release()
         cv2.destroyAllWindows()
 
 if __name__ == '__main__':
