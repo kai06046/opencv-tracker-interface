@@ -16,7 +16,7 @@ Type `python tracker.py` at command prompt and choose the video to initialze tra
 2. Press 'd' to delete bounding box
 3. Press 'a' to add bounding box
 
-Motion detection for adding bounding box automatically and better delete GUI are expected to be available in next version.
+Motion detection for adding bounding box automatically is expected to be available in next version.
 
 ## Model
 OpenCV build-in tracker has been already performing very well. However, since video of this project is grayscale and our target object is very similar with the context, human involvement to label target object is inevitable. Here is our procedures for training auto stop model:
