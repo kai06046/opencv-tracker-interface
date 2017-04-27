@@ -9,6 +9,7 @@ This is a multiple object tracker with human label interface created by OpenCV a
 * [OpenCV 3.1.0](https://anaconda.org/menpo/opencv3)
 * [mahotas 1.4.3](http://mahotas.readthedocs.io/en/latest/install.html)
 * [scikit-image 0.13.0](http://scikit-image.org/docs/dev/install.html)
+* [xgboost](https://www.ibm.com/developerworks/community/blogs/jfp/entry/Installing_XGBoost_For_Anaconda_on_Windows?lang=en)
 
 ## Usage description
 Type `python tracker.py` at command prompt and choose the video to initialze tracker by drawing target objects. The following are the current functions included while tracking:
