@@ -5,6 +5,7 @@
 import pywt._extensions._cwt
 from scipy.linalg import _fblas
 import scipy.spatial.ckdtree
+# import skvideo.io
 # from multiprocessing.context import Process
 # import numpy.core.multiarray
 
@@ -17,7 +18,7 @@ import _tkinter
 from collections import namedtuple
 from common import * # comman function 
 from tkinter.filedialog import askopenfilename
-from tkinter.messagebox import askyesno, showerror, showwarning
+from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
 
 # for stop-tracking-model
 from mahotas.features import haralick, zernike
@@ -46,7 +47,7 @@ MSG_COLOR = (0, 255, 255)
 FONT_SIZE_NM = 0.5
 FONT_SIZE_MG = 0.45
 FONT_SIZE_EMH = 0.6
-TRACK_ALGORITHM = 'MIL' # Other alternatives are BOOSTING, KCF, TLK, MEDIANFLOW 
+TRACK_ALGORITHM = 'BOOSTING' # Other alternatives are BOOSTING, KCF, TLD, MEDIANFLOW 
 BAR_HEIGHT = 100
 RESIZE = (100, 100)
 FLAG = args['flag_shape'] # if 1, use template size as feature
@@ -143,10 +144,10 @@ class Tracker():
         self._is_stop = None
 
         # background subtractor model, for adding potential bounding box
-        self._run_motion = True
+        self._run_motion = False
         self._bs = cv2.createBackgroundSubtractorMOG2()
         self._pot_rect =  []
-        
+
     # mouse callback method
     def _mouse_ops(self, event, x, y, flags, param):
         
@@ -324,7 +325,7 @@ class Tracker():
         
         cv2.putText(self.frame,'# %s/%s' % (int(self.count), int(self._frame_count)), (5, int(self.resolution[1]) + 25), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame,'# object %s' % self._len_bbox, (5, int(self.resolution[1]) + 50), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
-        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Model is running: %s' % (self.width, self.height, self.fps, self._run_model), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
+        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   beetle detector and retargeting model is running: %s  beetle adding model is running: %s'% (self.width, self.height, self.fps, self._run_model, self._run_motion), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame, 'r (retarget), a (add), d (delete), space (continue/pause), <- (previouse), -> (next), esc (close)', (120, int(self.resolution[1]) + 50), self.font, FONT_SIZE_MG, TXT_COLOR, 1)        
 
         # draw current labeling box
@@ -464,24 +465,30 @@ class Tracker():
 
     # after drawing new bounding box, ask user to enter object name
     def _add_name(self):
+
         self._askname = tk.Tk()
         self._askname.wm_title("Ask name")
         self._askname.geometry('240x80')
+        center(self._askname) # center the widget
 
         cbp1 = ttk.Labelframe(self._askname, text='Type or choose a name for the object')
+        
         cbp1.pack(side=tk.TOP, fill=tk.BOTH)
+        self._askname.grab_set_global() # make it modal dialog
+
         cb = ttk.Combobox(cbp1, values = self.deleted_name)
         if len(self.deleted_name) > 0:
             cb.current(0)
         cb.focus_force()
+        
         cb.bind('<Return>', self._update_values)
         cb.bind("<Return>", lambda event: self._quit_GUI(cb.get()))
         
         cb.pack(side=tk.TOP)
-
         btn = tk.Button(self._askname, text='Submit', command=(lambda: self._quit_GUI(cb.get())))
         btn.pack(side=tk.TOP)
-        
+
+        # self._askname.protocol('WM_DELETE_WINDOW', on_closing)
         self._askname.mainloop()
 
     # ask whether to add potential target
@@ -581,6 +588,10 @@ class Tracker():
                 # go to next frame is RIGHT KEY was pressed
                 elif key_add == KEY_RIGHT:
                     self._next_frame()
+                elif key_add == KEY_MODEL:
+                    self._run_model = not self._run_model
+                elif key_add == KEY_MOTION:
+                    self._run_motion = not self._run_motion
 
         # update ROI
         self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
@@ -625,6 +636,10 @@ class Tracker():
                 self._retargeting = False
                 self._delete_bboxes()
                 break
+            elif key_reset == KEY_MODEL:
+                self._run_model = not self._run_model
+            elif key_reset == KEY_MOTION:
+                self._run_motion = not self._run_motion
             # else just keep looping at current frame
             else:
                 video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
@@ -674,6 +689,10 @@ class Tracker():
             # go to next frame is RIGHT KEY was pressed
             elif key_delete == KEY_RIGHT:
                 self._next_frame()
+            elif key_delete == KEY_MODEL:
+                self._run_model = not self._run_model
+            elif key_delete == KEY_MOTION:
+                self._run_motion = not self._run_motion
             else:
                 self.frame = self.orig_col.copy()
 
@@ -718,6 +737,10 @@ class Tracker():
                 self._next_frame()
             elif key_pause == KEY_JUMP:
                 self._jump_frame()
+            elif key_pause == KEY_MODEL:
+                self._run_model = not self._run_model
+            elif key_pause == KEY_MOTION:
+                self._run_motion = not self._run_motion
             else:
                 self.frame = self.orig_col.copy()
 
@@ -850,7 +873,7 @@ class Tracker():
             pred = np.array([1 if v[1] > 0.4 else 0 for v in pred]) 
         else:
             pred = self._model.predict(xgb.DMatrix(X))
-            pred = np.array([1 if v > 0.4 else 0 for v in pred]) # i.e. continue only if the probability of beetle being in bounding box > 0.6
+            pred = np.array([1 if v > 0.3 else 0 for v in pred]) # i.e. continue only if the probability of beetle being in bounding box > 0.6
         
         is_overlapped = np.array([overlapped(self._roi[i], self._roi[0:i] + self._roi[i+1:]) for i in range(len(self._roi))])
         
@@ -868,7 +891,7 @@ class Tracker():
             for bbox_ind in np.where(pred == 1)[0]:
                 continue_prop = 0
                 n_try = 0    
-                while continue_prop < 0.65:
+                while continue_prop < 0.75:
                     x, y, w, h = random_target(self._bboxes[bbox_ind])
 
                     if (w / h) > 2 or (h / w) > 2 or area(Rectangle(self._roi[bbox_ind][0], self._roi[bbox_ind][1])) / area(Rectangle((x, y), (x+w, y+h))) < 0.7:
@@ -935,11 +958,11 @@ class Tracker():
     def start(self):
         
         # read video
-        video = cv2.VideoCapture(self._video)
+        # video = skvideo.io.VideoCapture(find_data_file(self._video))
+        video = cv2.VideoCapture(find_data_file(self._video))
         self.width = int(video.get(3))
         self.height = int(video.get(4))
         self.fps = int(video.get(5))
-        self.alert(str(self.fps))
         self.resolution = (self.width, self.height)
         self.file_name = self._video.split('/')[-1]
         self.video_name = self.file_name.split('.')[0]
@@ -982,7 +1005,8 @@ class Tracker():
             if len(self._bboxes) > 0 and self._run_model:
                 self._is_stop, self._stop_obj = self._stop_to_continue_update()
 
-            self._motion_detector()
+            if self._run_motion:
+                self._motion_detector()
 
             # if 'r' was pressed or stop model return True, enter to retarget mode
             if key == KEY_RETARGET or self._is_stop:
@@ -1033,12 +1057,25 @@ class Tracker():
         cv2.destroyAllWindows()
         pickle.dump(self._model, open('model/%s.dat' % args['model_name'], 'wb'))
 
-if __name__ == '__main__':
+def get_path():
     root = tk.Tk()
     root.withdraw()
     path = askopenfilename(title='Where is the video?', filetypes=[('video file (*.avi;*.mp4)','*.avi;*.mp4')])
-    root.destroy()
+    if path == "":
+        if askokcancel('Quit', 'Do you want to quit the program?'):
+            root.destroy()
+            sys.exit()
+        else:
+            root.destroy()
+            get_path()
+    else:
+        root.destroy()
     root.mainloop()
+
+    return path
+if __name__ == '__main__':
+
+    path = get_path()
     # path = args['video_path']
     burying_beetle_tracker = Tracker(video_path=path, fps=15)
     burying_beetle_tracker.start()
