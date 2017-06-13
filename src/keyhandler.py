@@ -2,7 +2,6 @@ import cv2, time
 from src.common import *
 import tkinter as tk
 from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
-
 # keyboard return value while it was pressed
 KEY_CONTINUE = ord(' ')
 KEY_ESC = 27
@@ -205,14 +204,13 @@ class KeyHandler(BasicOperation):
                                        roi_pts[1][0] - roi_pts[0][0], roi_pts[1][1] - roi_pts[0][1])
                 # self._update_model(type='continue')
                 self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
-                self._record[self.object_name[self._n]]['trace'] = []
+                if self.object_name[self._n] in self._record.keys(): self._record[self.object_name[self._n]]['trace'] = []
             else:
                 self.alert('Please draw bounding box in side the frame')
                 self._roi_pts = []
             self._roi_pts = []
         # check if the left mouse button was clicked, and whether is in init mode
         elif (event == cv2.EVENT_LBUTTONDOWN) and self._add_box:
-        # elif (event == cv2.EVENT_LBUTTONDOWN or event == cv2.EVENT_LBUTTONDBLCLK) and self._add_box:
             self._roi_pts = [(x, y)] # reset ROI points and record the starting coordinates
         # check if the left mouse button was released and whether is in init mode
         elif (event == cv2.EVENT_LBUTTONUP) and self._add_box:
@@ -279,8 +277,11 @@ class KeyHandler(BasicOperation):
             showerror('Error', 'Require integer')
 
     # jump frame
-    def _jump_frame(self):
+    def _jump_frame(self, action_func=None):
+        action_func = action_func if action_func else self._pause_frame
+
         video = cv2.VideoCapture(self._video)
+        orig_frame_count = self.count
 
         self.root = tk.Tk()
         self.root.wm_title("Enter # Frame")
@@ -296,15 +297,19 @@ class KeyHandler(BasicOperation):
         
         btn = tk.Button(self.root, text='Submit', command=(lambda: self._get_frame_num(ent.get())))
         btn.pack(side=tk.TOP)
-        
+
         self.root.mainloop()
 
-        # read next frame and obtain bounding boxes
-        video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
-        _, self.frame = video.read()
-        self._init_frame()
-        self._read_bboxes()
-        self._pause_frame()
+        if self.count != orig_frame_count:
+            # read next frame and obtain bounding boxes
+            video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
+            _, self.frame = video.read()
+            self._init_frame()
+            self._read_bboxes()
+            action_func()
+            self._record = {}
+            self._stop_obj = None
+            self._is_stop = False
 
     # add bounding boxes
     def _add_bboxes(self):
@@ -328,6 +333,7 @@ class KeyHandler(BasicOperation):
                     self._draw_bbox()
                     cv2.imshow(self.window_name, self.frame)
                     if self._ask_quit():
+                        self.out.release()
                         exit()
                     else:
                         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL + cv2.WINDOW_KEEPRATIO)
@@ -357,9 +363,12 @@ class KeyHandler(BasicOperation):
                             pass
                 # if 'r' was pressed, enter retarget boudning box mode
                 elif key_add == KEY_RETARGET:
-                    self._add_box = False
-                    self._retarget_bboxes()
-                    break
+                    if self._len_bbox != 0:
+                        self._add_box = False
+                        self._retarget_bboxes()
+                        break
+                    else:
+                        self.alert('There is no bounding box to be retargeted')
                 # if 'd' was pressed, enter delete boudning box mode
                 elif key_add == KEY_DELETE:
                     self._add_box = False
@@ -372,7 +381,10 @@ class KeyHandler(BasicOperation):
                 elif key_add == KEY_RIGHT:
                     self._next_frame()
                 elif key_add == KEY_JUMP:
-                    self._jump_frame()
+                    temp_count = self.count
+                    self._jump_frame(self._add_bboxes)
+                    if temp_count != self.count:
+                        break
                 elif key_add == KEY_MODEL:
                     self._run_model = not self._run_model
                 elif key_add == KEY_MOTION:
@@ -391,6 +403,7 @@ class KeyHandler(BasicOperation):
         self._n = self._stop_obj[0] if self._is_stop else 0 
         
         self._retargeting = True
+        self._roi_pts = []
         # looping the current frame until SPACE was pressed
         while True:
 
@@ -400,6 +413,7 @@ class KeyHandler(BasicOperation):
                 self._draw_bbox()
                 cv2.imshow(self.window_name, self.frame)
                 if self._ask_quit():
+                    self.out.release()
                     exit()
                 else:
                     cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
@@ -423,7 +437,10 @@ class KeyHandler(BasicOperation):
             elif key_reset == KEY_RIGHT:
                 self._next_frame()
             elif key_reset == KEY_JUMP:
-                self._jump_frame()
+                temp_count = self.count
+                self._jump_frame(self._retarget_bboxes)
+                if temp_count != self.count:
+                    break
             # if 'a' was pressed, enter add boudning box mode
             elif key_reset == KEY_ADD:
                 self._retargeting = False
@@ -463,9 +480,12 @@ class KeyHandler(BasicOperation):
                 self._delete_box = True
             # if 'r' was pressed, enter retarget boudning box mode
             elif key_delete == KEY_RETARGET:
-                self._delete_box = False
-                self._retarget_bboxes()
-                break
+                if self._len_bbox != 0:
+                    self._delete_box = False
+                    self._retarget_bboxes()
+                    break
+                else:
+                    self.alert('There is no bounding box to be retargeted')   
             # if 'a' was pressed, enter add boudning box mode
             elif key_delete == KEY_ADD:
                 self._delete_box = False
@@ -488,7 +508,10 @@ class KeyHandler(BasicOperation):
             elif key_delete == KEY_RIGHT:
                 self._next_frame()
             elif key_delete == KEY_JUMP:
-                self._jump_frame()
+                temp_count = self.count
+                self._jump_frame(self._delete_bboxes)
+                if temp_count != self.count:
+                    break
             elif key_delete == KEY_MODEL:
                 self._run_model = not self._run_model
             elif key_delete == KEY_MOTION:
@@ -498,6 +521,7 @@ class KeyHandler(BasicOperation):
                 self._draw_bbox()
                 cv2.imshow(self.window_name, self.frame)
                 if self._ask_quit():
+                    self.out.release()
                     exit()
                 else:
                     cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
@@ -525,9 +549,12 @@ class KeyHandler(BasicOperation):
                     break
             # if 'r' was pressed, enter retarget boudning box mode
             elif key_pause == KEY_RETARGET:
-                self._pause = False
-                self._retarget_bboxes()
-                break
+                if self._len_bbox != 0:
+                    self._pause = False
+                    self._retarget_bboxes()
+                    break
+                else:
+                    self.alert('There is no bounding box to be retargeted')
             # if 'a' was pressed, enter add boudning box mode
             elif key_pause == KEY_ADD:
                 self._pause = False
@@ -545,7 +572,10 @@ class KeyHandler(BasicOperation):
             elif key_pause == KEY_RIGHT:
                 self._next_frame()
             elif key_pause == KEY_JUMP:
-                self._jump_frame()
+                temp_count = self.count
+                self._jump_frame(self._pause_frame)
+                if temp_count != self.count:
+                    break
             elif key_pause == KEY_MODEL:
                 self._run_model = not self._run_model
             elif key_pause == KEY_MOTION:
@@ -555,6 +585,7 @@ class KeyHandler(BasicOperation):
                 self._draw_bbox()
                 cv2.imshow(self.window_name, self.frame)
                 if self._ask_quit():
+                    self.out.release()
                     exit()
                 else:
                     cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)

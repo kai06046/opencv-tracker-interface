@@ -37,7 +37,7 @@ from skimage.measure import compare_ssim
 # for deep learning model
 from keras.models import load_model
 
-args = {'model_name': 'resnet_first_2_freeze_2', 'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False, 
+args = {'model_name': 'resnet_first_2_freeze_1', 'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False, 
         'run_model': True, 'save_pos': False, 'is_dl': True}
 
 # basic variables

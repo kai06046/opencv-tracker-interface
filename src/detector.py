@@ -15,6 +15,7 @@ params = {'objective': 'binary:logistic', 'verbose': False,
           'gamma': 0.5, 'subsample': 0.5, 'colsample_bytree': 0.5}
 
 Rectangle = namedtuple('Rectangle', 'p1 p2')
+KEY_ESC = 27
 
 class BeetleDetector(object):
     # extract features for stop model
@@ -74,7 +75,7 @@ class BeetleDetector(object):
             for i, p in enumerate(pred):
                 print('%s: %s' % (self.object_name[i], round(pred[i][0], 3)))
 
-            pred = np.array([1 if v[0] > 0.4 else 0 for v in pred]) # i.e. continue only if the probability of bounding box has beetle < 0.4
+            prediction = np.array([1 if v[0] > 0.4 else 0 for v in pred]) # i.e. continue only if the probability of bounding box has beetle < 0.4
         else:
             X = np.array(X)
             if not TEMP: 
@@ -94,16 +95,18 @@ class BeetleDetector(object):
             if v:
                 stop_obj.append(i)
 
-        pred[is_overlapped] = 0
+        prediction[is_overlapped] = 0
 
         # if any bounding box has value 1, resampling candidates of bounding box
-        if any(pred == 1):
+        if any(prediction == 1):
             
             start = time.clock()
             
             temp = self.frame.copy()
 
-            for bbox_ind in np.where(pred == 1)[0]:
+            for bbox_ind in np.where(prediction == 1)[0]:
+                orig_prob = pred[bbox_ind][0] # current bounding box index background probability
+
                 continue_prop = 0
                 try:
                     trace = np.array(self._record[self.object_name[bbox_ind]]['trace'])
@@ -113,29 +116,51 @@ class BeetleDetector(object):
                     trace_diff = []
                 n_try = 0    
 
-                while continue_prop < 0.7:
+                key = cv2.waitKey(1)
+                while continue_prop < 0.8:
+                    if key == KEY_ESC or (cv2.getWindowProperty(self.window_name, 0) < 0):
+                        # draw current frame
+                        self._draw_bbox()
+                        cv2.imshow(self.window_name, self.frame)
+                        if self._ask_quit():
+                            beetle_tracker.out.release()
+                            exit()
+                        else:
+                            cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
+                            cv2.setMouseCallback(self.window_name, self._mouse_ops)
+                            cv2.imshow(self.window_name, self.frame)
+
                     # use the change of previous coordinate
                     if len(trace_diff) > 0:
                         x, y, w, h = self._bboxes[bbox_ind]
                         temp_diff = trace_diff.pop(0)
                         x, y, w, h = max(0, int(x + temp_diff[0])), max(0, int(y + temp_diff[1])), max(10, vary(int(w), 10, False)), max(10, vary(int(h), 10, False))
+
                     else:
                         x, y, w, h = random_target(self._bboxes[bbox_ind])
                     
-                    # display random bounding box
-                    cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
-                    self._draw_bbox()
-                    cv2.imshow(self.window_name, self.frame)
-                    cv2.waitKey(1)
+                    ratio_cond = '(w / h) > 2 or (h / w) > 2'
+                    boundary_cond = 'y > self.height or (y+h) > self.height or x > self.width or (x+w) > self.width'
 
-                    if (w / h) > 2 or (h / w) > 2 or area(Rectangle(self._roi[bbox_ind][0], self._roi[bbox_ind][1])) / area(Rectangle((x, y), (x+w, y+h))) < 0.7:
+                    if  eval(ratio_cond) or eval(boundary_cond) or area(Rectangle(self._roi[bbox_ind][0], self._roi[bbox_ind][1])) / area(Rectangle((x, y), (x+w, y+h))) < 0.7:
                         pass
                     else:
+                        # display random bounding box
+                        cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
+                        self._draw_bbox()
+                        cv2.imshow(self.window_name, self.frame)
+                        cv2.waitKey(1)
                         if is_dl:
                             random_roi_feature = [self.extract_features(self.orig_col[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
                             random_roi_feature = np.array(random_roi_feature)
-                            pred = self._model.predict(random_roi_feature)
-                            continue_prop = 1- pred[0][0]
+                            pred_random = self._model.predict(random_roi_feature)[0][0]
+                            # if pred_random < orig_prob:
+                                # print('original prob: %s pred_random: %s' % (orig_prob, pred_random))
+                                # orig_prob = pred_random
+                                # self._bboxes[bbox_ind] = (x, y, w, h)
+                                # print('update bbox but still continue update')
+
+                            continue_prop = 1- pred_random
                         else:
                             random_roi_feature = [self.extract_features(self.orig_gray[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
                             random_roi_feature = np.array(random_roi_feature)
