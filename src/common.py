@@ -11,7 +11,7 @@ convert = lambda x, y, w, h: [(int(x), int(y)), (int(x + w), int(y + h))]
 # add randomness to an integer
 vary = lambda x, var, flag: x + abs(np.random.randint(-var, var)) if flag else x + np.random.randint(-var, var)
 # random a new bounding box with a bounding box as input
-def random_target(bbox, var = 35, r = 0.3, flag=False):
+def random_target(bbox, var = 35, r = 0.28, flag=False):
     x, y, w, h = bbox
     # x1, y1 = vary(x, var, flag), vary(y, var, flag)
     x1, y1, w1, h1 = vary(x, var, flag), vary(y, var, flag), vary(w, int(var*r), flag), vary(h, int(var*r), flag)

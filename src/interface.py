@@ -132,6 +132,8 @@ class Interface(object):
         self._bboxes = np.delete(self._bboxes, self._n, axis=0)
         self._len_bbox -= 1
         self._init_bbox.pop()
+        if self._stop_obj:
+            self._stop_obj.pop(self._stop_obj.index(self._n))
         self.deleted_name.append(self.object_name.pop(self._n))
         self._initialize_tracker()
         # update ROI

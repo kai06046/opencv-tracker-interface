@@ -91,11 +91,11 @@ class BeetleDetector(object):
         
         if any(is_overlapped): print('Detect overlapped')
 
-        for i, v in enumerate(is_overlapped):
-            if v:
-                stop_obj.append(i)
+        # for i, v in enumerate(is_overlapped):
+        #     if v:
+        #         stop_obj.append(i)
 
-        prediction[is_overlapped] = 0
+        # prediction[is_overlapped] = 0
 
         # if any bounding box has value 1, resampling candidates of bounding box
         if any(prediction == 1):
@@ -110,14 +110,15 @@ class BeetleDetector(object):
                 continue_prop = 0
                 try:
                     trace = np.array(self._record[self.object_name[bbox_ind]]['trace'])
+                    print(trace)
                     # last 10 diff
                     trace_diff = np.diff(trace, axis=0)[::-1][:10].tolist()
                 except:
                     trace_diff = []
-                n_try = 0    
+                n_try = 1    
 
                 key = cv2.waitKey(1)
-                while continue_prop < 0.8:
+                while continue_prop < 0.65:
                     if key == KEY_ESC or (cv2.getWindowProperty(self.window_name, 0) < 0):
                         # draw current frame
                         self._draw_bbox()
@@ -134,12 +135,13 @@ class BeetleDetector(object):
                     if len(trace_diff) > 0:
                         x, y, w, h = self._bboxes[bbox_ind]
                         temp_diff = trace_diff.pop(0)
-                        x, y, w, h = max(0, int(x + temp_diff[0])), max(0, int(y + temp_diff[1])), max(10, vary(int(w), 10, False)), max(10, vary(int(h), 10, False))
+                        x, y, w, h = max(0, int(x + temp_diff[0])), max(0, int(y + temp_diff[1])), int(w), int(h)
+                        # x, y, w, h = max(0, int(x + temp_diff[0])), max(0, int(y + temp_diff[1])), max(10, vary(int(w), 10, False)), max(10, vary(int(h), 10, False))
 
                     else:
                         x, y, w, h = random_target(self._bboxes[bbox_ind])
                     
-                    ratio_cond = '(w / h) > 2 or (h / w) > 2'
+                    ratio_cond = '(w / h) > 1.8 or (h / w) > 1.8'
                     boundary_cond = 'y > self.height or (y+h) > self.height or x > self.width or (x+w) > self.width'
 
                     if  eval(ratio_cond) or eval(boundary_cond) or area(Rectangle(self._roi[bbox_ind][0], self._roi[bbox_ind][1])) / area(Rectangle((x, y), (x+w, y+h))) < 0.7:
@@ -147,9 +149,14 @@ class BeetleDetector(object):
                     else:
                         # display random bounding box
                         cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
+                        cv2.putText(self.frame, '# retargeting %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (int(self.resolution[0]/2.9), int(self.resolution[1]/3)), self.font, 1.15, (0, 255, 255), 2)
                         self._draw_bbox()
                         cv2.imshow(self.window_name, self.frame)
-                        cv2.waitKey(1)
+                        key_model = cv2.waitKey(1)
+
+                        if key_model == 27:
+                            return False, None
+
                         if is_dl:
                             random_roi_feature = [self.extract_features(self.orig_col[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
                             random_roi_feature = np.array(random_roi_feature)
@@ -398,9 +405,15 @@ class MotionDetector(object):
                 potential_rect.append((x, y, w, h))
 
         if len(potential_rect) > 0:
+            
             X_potential = np.array([self.extract_features(self.orig_col.copy()[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate) for x, y, w, h in potential_rect])
-            pred_potential = self._model.predict(xgb.DMatrix(X_potential))
-            pred_potential = np.array([1 if v < 0.5 else 0 for v in pred_potential])
+            
+            if is_dl:
+                pred_potential = self._model.predict(X_potential)
+                pred_potential = np.array([1 if v[0] < 0.4 else 0 for v in pred_potential])
+            else:    
+                pred_potential = self._model.predict(xgb.DMatrix(X_potential))
+                pred_potential = np.array([1 if v < 0.5 else 0 for v in pred_potential])
 
             if any(pred_potential == 1):
                 self._pot_rect = np.array(potential_rect)[np.where(pred_potential == 1)]
@@ -416,10 +429,13 @@ class MotionDetector(object):
                         if (w1 / h1) > 2 or (h1 / w1) > 2:
                             pass
                         else:
-                            random_roi_feature = [self.extract_features(self.orig_gray[y1:(y1+h1), x1:(x1+w1)], flag, inputShape, is_dl, is_olupdate)]
+                            random_roi_feature = [self.extract_features(self.orig_col[y1:(y1+h1), x1:(x1+w1)], flag, inputShape, is_dl, is_olupdate)]
                             random_roi_feature = np.array(random_roi_feature)
 
-                            if not TEMP:
+                            if is_dl:
+                                pred = self._model.predict(random_roi_feature)
+                                is_obj_prop = 1 - pred[0][0]
+                            elif not TEMP:
                                 pred = self._model.predict_proba(random_roi_feature)
                                 is_obj_prop = pred[0][0]
                             else:
