@@ -1,11 +1,12 @@
 # opencv-tracker-interface
 
-This is a multiple object tracker with human label interface created by OpenCV and Python. Given with proper trained model, it can auto stop while the tracker lost the objects.
+This is a multiple object tracker with human label interface created by OpenCV and Python. Given with proper trained model, it can auto stop while the tracker lost the objects and auto update to current location.
 
 ## Version and Dependencies
 
 * OS: Windows 7
 * Python 3.5.2 
+* Keras 2.0.4
 * [OpenCV 3.1.0](https://anaconda.org/menpo/opencv3)
 * [mahotas 1.4.3](http://mahotas.readthedocs.io/en/latest/install.html)
 * [scikit-image 0.13.0](http://scikit-image.org/docs/dev/install.html)
@@ -25,8 +26,8 @@ OpenCV build-in tracker has been already performing very well. However, since vi
 1. Generate images that contain desired object by the tracker without auto stop model
 2. Randomly generate  a bunch of image without object. 
 3. Extract image descriptors like histogram, Haralick and Zernike Momemnts, etc
-4. Train model (like xgboost) by labeling image without object as 1 and image contains object as 0
+4. Train model (like neural network or xgboost) by labeling image without object as 1 and image contains object as 0
 
-After adding model in the tracker, if model detects there is no object in the any bounding boxes then the tracker will stop tracking and let's user to decide the next move.
+After adding model in the tracker, if model detects there is no object in the any bounding boxes then the tracker will first random candidates and fit into model for a numbers. If model predicts that there is beetle inside the candidate bounding box,  tracking process continue with the candidate bounding box. Otherwise, tracking will stop and let's user to decide the next move.
 
 
