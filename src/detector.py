@@ -95,7 +95,7 @@ class BeetleDetector(object):
         #     if v:
         #         stop_obj.append(i)
 
-        # prediction[is_overlapped] = 0
+        prediction[is_overlapped] = 0
 
         # if any bounding box has value 1, resampling candidates of bounding box
         if any(prediction == 1):
@@ -110,9 +110,9 @@ class BeetleDetector(object):
                 continue_prop = 0
                 try:
                     trace = np.array(self._record[self.object_name[bbox_ind]]['trace'])
-                    print(trace)
+                    
                     # last 10 diff
-                    trace_diff = np.diff(trace, axis=0)[::-1][:10].tolist()
+                    trace_diff = np.vstack((np.diff(trace, axis=0)[::-1][:10], trace[-1] - trace[0])).tolist()
                 except:
                     trace_diff = []
                 n_try = 1    
@@ -149,13 +149,15 @@ class BeetleDetector(object):
                     else:
                         # display random bounding box
                         cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
-                        cv2.putText(self.frame, '# retargeting %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (int(self.resolution[0]/2.9), int(self.resolution[1]/3)), self.font, 1.15, (0, 255, 255), 2)
+                        cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
                         self._draw_bbox()
                         cv2.imshow(self.window_name, self.frame)
                         key_model = cv2.waitKey(1)
 
                         if key_model == 27:
-                            return False, None
+                            is_retarget = False
+                            break
+                            # return False, None
 
                         if is_dl:
                             random_roi_feature = [self.extract_features(self.orig_col[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
@@ -211,18 +213,102 @@ class BeetleDetector(object):
         else:
             return False, None
 
-    # update model with incremental data
-    def _update_model(self, type='stop'):
-        if self._update:            
-            x, y, w, h = self._bboxes[self._n]
-            img = self.orig_gray[y:(y+h), x:(x+w)]
-            if type == 'stop':
-                xg_train = xgb.DMatrix(np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)]), np.array([1]))
-            else:
-                xg_train = xgb.DMatrix(np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)]), np.array([0]))
+class MotionDetector(object):
+    # detect motion for potential target
+    def _motion_detector(self, flag, inputShape, is_dl, is_olupdate, TEMP, N_MAX):
 
-            self._model = xgb.train(params, xg_train, 50, xgb_model = self._model)
-            print('Model updated')
+        fg_mask = self._bs.apply(self.orig_gray.copy())
+
+        potential_rect = []
+
+        th = cv2.threshold(fg_mask.copy(), 230, 255, cv2.THRESH_BINARY)[1]
+        # cv2.imshow('hi', th)
+        # cv2.waitKey(1)
+        th = cv2.erode(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
+        
+        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 5)), iterations=2)
+        
+        # get contours from dilated frame
+        _, contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        for c in contours:
+            # get estimated bounding box of contour
+            x, y, w, h = cv2.boundingRect(c)
+            # calculate the area
+            area = cv2.contourArea(c)
+            if area > 200 and area < 1000:
+                potential_rect.append((x, y, w, h))
+
+        if len(potential_rect) > 0:
+            
+            X_potential = np.array([self.extract_features(self.orig_col.copy()[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate) for x, y, w, h in potential_rect])
+            
+            if is_dl:
+                pred_potential = self._model.predict(X_potential)
+                pred_potential = np.array([1 if v[0] < 0.4 else 0 for v in pred_potential])
+            else:    
+                pred_potential = self._model.predict(xgb.DMatrix(X_potential))
+                pred_potential = np.array([1 if v < 0.5 else 0 for v in pred_potential])
+
+            if any(pred_potential == 1):
+                self._pot_rect = np.array(potential_rect)[np.where(pred_potential == 1)]
+                self._pot_rect = list(self._pot_rect)
+                pot_rect_orig = self._pot_rect
+
+                temp = self.frame.copy()
+                for i, r in enumerate(self._pot_rect):
+                    x, y, w, h = r
+                    is_obj_prop = 0
+                    n_try = 0    
+                    while is_obj_prop < 0.65:
+                        x1, y1, w1, h1 = random_target(r, 50, 2, True)
+                        if (w1 / h1) > 2 or (h1 / w1) > 2:
+                            pass
+                        else:
+                            # display random bounding box
+                            cv2.rectangle(self.frame, (x1, y1), (x1+w1, y1+h1), self.color[len(self.object_name)], 2)
+                            cv2.putText(self.frame, '# detecting potential beetle %s/%s: %s/%s' % (i+1, len(self._pot_rect), n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
+                            self._draw_bbox()
+                            cv2.imshow(self.window_name, self.frame)
+                            key_model = cv2.waitKey(1)
+
+                            if key_model == 27:
+                                break
+                            random_roi_feature = [self.extract_features(self.orig_col[y1:(y1+h1), x1:(x1+w1)], flag, inputShape, is_dl, is_olupdate)]
+                            random_roi_feature = np.array(random_roi_feature)
+
+                            if is_dl:
+                                pred = self._model.predict(random_roi_feature)
+                                is_obj_prop = 1 - pred[0][0]
+                            elif not TEMP:
+                                pred = self._model.predict_proba(random_roi_feature)
+                                is_obj_prop = pred[0][0]
+                            else:
+                                pred = self._model.predict(xgb.DMatrix(random_roi_feature))
+                                is_obj_prop = 1 - pred[0]
+                        n_try += 1
+                        if n_try >= N_MAX / 2:
+                            break
+
+                        self.frame = temp.copy()
+                    if n_try < N_MAX:        
+                        r = (x1, y1, w1, h1)
+                    else:
+                        try:
+                            pot_rect_orig.pop(pot_rect_orig.index(r))
+                        except:
+                            pass
+
+                self._pot_rect = pot_rect_orig
+
+                self._pot_rect = [convert(a[0], a[1], a[2], a[3]) for a in self._pot_rect]
+                filter_condition = [not overlapped(rect, self._roi) for rect in self._pot_rect]
+                self._pot_rect = [rect for (rect, v) in zip(self._pot_rect, filter_condition) if v]
+
+            else:
+                self._pot_rect = []
+        else:
+            self._pot_rect =  []
 
 class OnlineUpdateDetector(object):
     # generate postive image inside bounding box and update in record
@@ -378,88 +464,16 @@ class OnlineUpdateDetector(object):
         else:
             return False, None
 
-class MotionDetector(object):
-	# detect motion for potential target
-    def _motion_detector(self, flag, inputShape, is_dl, is_olupdate, TEMP, N_MAX):
-
-        fg_mask = self._bs.apply(self.orig_gray.copy())
-
-        potential_rect = []
-
-        th = cv2.threshold(fg_mask.copy(), 230, 255, cv2.THRESH_BINARY)[1]
-        # cv2.imshow('hi', th)
-        # cv2.waitKey(1)
-        th = cv2.erode(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
-        
-        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 5)), iterations=2)
-        
-        # get contours from dilated frame
-        _, contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        for c in contours:
-            # get estimated bounding box of contour
-            x, y, w, h = cv2.boundingRect(c)
-            # calculate the area
-            area = cv2.contourArea(c)
-            if area > 200 and area < 1000:
-                potential_rect.append((x, y, w, h))
-
-        if len(potential_rect) > 0:
-            
-            X_potential = np.array([self.extract_features(self.orig_col.copy()[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate) for x, y, w, h in potential_rect])
-            
-            if is_dl:
-                pred_potential = self._model.predict(X_potential)
-                pred_potential = np.array([1 if v[0] < 0.4 else 0 for v in pred_potential])
-            else:    
-                pred_potential = self._model.predict(xgb.DMatrix(X_potential))
-                pred_potential = np.array([1 if v < 0.5 else 0 for v in pred_potential])
-
-            if any(pred_potential == 1):
-                self._pot_rect = np.array(potential_rect)[np.where(pred_potential == 1)]
-                self._pot_rect = list(self._pot_rect)
-                pot_rect_orig = self._pot_rect
-
-                for i, r in enumerate(self._pot_rect):
-                    x, y, w, h = r
-                    is_obj_prop = 0
-                    n_try = 0    
-                    while is_obj_prop < 0.7:
-                        x1, y1, w1, h1 = random_target(r, 30, 2, True)
-                        if (w1 / h1) > 2 or (h1 / w1) > 2:
-                            pass
-                        else:
-                            random_roi_feature = [self.extract_features(self.orig_col[y1:(y1+h1), x1:(x1+w1)], flag, inputShape, is_dl, is_olupdate)]
-                            random_roi_feature = np.array(random_roi_feature)
-
-                            if is_dl:
-                                pred = self._model.predict(random_roi_feature)
-                                is_obj_prop = 1 - pred[0][0]
-                            elif not TEMP:
-                                pred = self._model.predict_proba(random_roi_feature)
-                                is_obj_prop = pred[0][0]
-                            else:
-                                pred = self._model.predict(xgb.DMatrix(random_roi_feature))
-                                is_obj_prop = 1 - pred[0]
-                        n_try += 1
-                        if n_try >= N_MAX / 2:
-                            break
-                    if n_try < N_MAX:        
-                        r = (x1, y1, w1, h1)
-                    else:
-                        try:
-                            pot_rect_orig.pop(pot_rect_orig.index(r))
-                        except:
-                            pass
-
-                self._pot_rect = pot_rect_orig
-
-                self._pot_rect = [convert(a[0], a[1], a[2], a[3]) for a in self._pot_rect]
-                filter_condition = [not overlapped(rect, self._roi) for rect in self._pot_rect]
-                self._pot_rect = [rect for (rect, v) in zip(self._pot_rect, filter_condition) if v]
-
-
+    # update model with incremental data
+    def _update_model(self, type='stop'):
+        if self._update:            
+            x, y, w, h = self._bboxes[self._n]
+            img = self.orig_gray[y:(y+h), x:(x+w)]
+            if type == 'stop':
+                xg_train = xgb.DMatrix(np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)]), np.array([1]))
             else:
-                self._pot_rect = []
-        else:
-            self._pot_rect =  []
+                xg_train = xgb.DMatrix(np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)]), np.array([0]))
+
+            self._model = xgb.train(params, xg_train, 50, xgb_model = self._model)
+            print('Model updated')        
+
