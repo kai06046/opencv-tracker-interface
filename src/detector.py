@@ -22,7 +22,6 @@ class BeetleDetector(object):
     @staticmethod
     def extract_features(img, flag, inputShape, is_dl, is_olupdate):
         if is_dl:
-            start = time.clock()
             # img_to_array(load_img)
             img = cv2.resize(img, inputShape, interpolation = cv2.INTER_NEAREST)
             # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -129,65 +128,100 @@ class BeetleDetector(object):
                         else:
                             cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
                             cv2.setMouseCallback(self.window_name, self._mouse_ops)
-                            cv2.imshow(self.window_name, self.frame)
-
-                    # use the change of previous coordinate
+                            cv2.imshow(self.window_name, self.frame)                    
+                    
+                    # section for using group rectangle
                     if len(trace_diff) > 0:
                         x, y, w, h = self._bboxes[bbox_ind]
                         temp_diff = trace_diff.pop(0)
                         x, y, w, h = max(0, int(x + temp_diff[0])), max(0, int(y + temp_diff[1])), int(w), int(h)
-                        # x, y, w, h = max(0, int(x + temp_diff[0])), max(0, int(y + temp_diff[1])), max(10, vary(int(w), 10, False)), max(10, vary(int(h), 10, False))
+                        ratio_cond = '(w / h) > 1.8 or (h / w) > 1.8'
+                        boundary_cond = 'y > self.height or (y+h) > self.height or x > self.width or (x+w) > self.width'
+                        if  eval(ratio_cond) or eval(boundary_cond) or area(Rectangle(self._roi[bbox_ind][0], self._roi[bbox_ind][1])) / area(Rectangle((x, y), (x+w, y+h))) < 0.7:
+                            pass
+                        else:
+                            # display random bounding box
+                            cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
+                            cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
+                            self._draw_bbox()
+                            cv2.imshow(self.window_name, self.frame)
+                            key_model = cv2.waitKey(1)
 
-                    else:
-                        x, y, w, h = random_target(self._bboxes[bbox_ind])
-                    
-                    ratio_cond = '(w / h) > 1.8 or (h / w) > 1.8'
-                    boundary_cond = 'y > self.height or (y+h) > self.height or x > self.width or (x+w) > self.width'
+                            if key_model == 27:
+                                print('break from the auto retargeting')
+                                is_retarget = False
+                                break
+                                # return False, None
 
-                    if  eval(ratio_cond) or eval(boundary_cond) or area(Rectangle(self._roi[bbox_ind][0], self._roi[bbox_ind][1])) / area(Rectangle((x, y), (x+w, y+h))) < 0.7:
-                        pass
+                            if is_dl:
+                                random_roi_feature = [self.extract_features(self.orig_col[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
+                                random_roi_feature = np.array(random_roi_feature)
+                                pred_random = self._model.predict(random_roi_feature)[0][0]
+                                # if pred_random < orig_prob:
+                                    # print('original prob: %s pred_random: %s' % (orig_prob, pred_random))
+                                    # orig_prob = pred_random
+                                    # self._bboxes[bbox_ind] = (x, y, w, h)
+                                    # print('update bbox but still continue update')
+
+                                continue_prop = 1- pred_random
+                            else:
+                                random_roi_feature = [self.extract_features(self.orig_gray[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
+                                random_roi_feature = np.array(random_roi_feature)
+                                if not TEMP:
+                                    pred = self._model.predict_proba(random_roi_feature)
+                                    continue_prop = pred[0][0]
+                                else:
+                                    pred = self._model.predict(xgb.DMatrix(random_roi_feature))
+                                    continue_prop = 1 - pred[0]
                     else:
-                        # display random bounding box
+                        n_candidates = 30
+                        random_candidates = random_target_a(self._bboxes[bbox_ind], size=(n_candidates, 1)).astype('int')
+                        random_roi_feature = [self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], flag, inputShape, is_dl, is_olupdate) for r in random_candidates]
+                        random_roi_feature = np.array(random_roi_feature)
+                        pred_time = time.clock()
+                        print('predicting...')
+                        pred_random = self._model.predict(random_roi_feature)
+                        print('predict %s candidates took %s secs' % (n_candidates, round(time.clock() - pred_time)))
+                        thres = np.where(pred_random < 0.5)[0]
+                        if len(thres) > 0:
+                            print('grouping candidates')
+                            if len(thres) > 1:
+                                rects = random_candidates[thres]
+                                print(rects)
+                                gp_rects, _ = cv2.groupRectangles(rects.tolist(), min(2, len(rects) - 1), eps=1)
+                                print(gp_rects)
+                                x, y, w, h = gp_rects[0]
+                            else:
+                                x, y, w, h = random_candidates[thres][0]
+                                print(x, y, w, h)
+                            
+                            continue_prop = 1- pred_random[thres].mean()
+                        else:
+                            print('no candidates has beetle')
+                            gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
+                            x, y, w, h = gp_rects[0]
+                            continue_prop = 0
+
                         cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
                         cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
                         self._draw_bbox()
                         cv2.imshow(self.window_name, self.frame)
                         key_model = cv2.waitKey(1)
-
+                        
                         if key_model == 27:
+                            print('break from the auto retargeting')
                             is_retarget = False
                             break
-                            # return False, None
 
-                        if is_dl:
-                            random_roi_feature = [self.extract_features(self.orig_col[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
-                            random_roi_feature = np.array(random_roi_feature)
-                            pred_random = self._model.predict(random_roi_feature)[0][0]
-                            # if pred_random < orig_prob:
-                                # print('original prob: %s pred_random: %s' % (orig_prob, pred_random))
-                                # orig_prob = pred_random
-                                # self._bboxes[bbox_ind] = (x, y, w, h)
-                                # print('update bbox but still continue update')
-
-                            continue_prop = 1- pred_random
-                        else:
-                            random_roi_feature = [self.extract_features(self.orig_gray[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
-                            random_roi_feature = np.array(random_roi_feature)
-                            if not TEMP:
-                                pred = self._model.predict_proba(random_roi_feature)
-                                continue_prop = pred[0][0]
-                            else:
-                                pred = self._model.predict(xgb.DMatrix(random_roi_feature))
-                                continue_prop = 1 - pred[0]
-
-                        print('Probability of beetle in bounding box %s: %s' % (self.object_name[bbox_ind], round(continue_prop, 3)))
-                        n_try += 1
-                        if n_try >= N_MAX:
-                            # self._n = bbox_ind
-                            # is_retarget = self._ask_retarget_box()
-                            break
-                        else:
-                            is_retarget = False
+                    # section end for using group rectangle
+                    print('Probability of beetle in bounding box %s: %s' % (self.object_name[bbox_ind], round(continue_prop, 3)))
+                    n_try += 1
+                    if n_try >= N_MAX:
+                        # self._n = bbox_ind
+                        # is_retarget = self._ask_retarget_box()
+                        break
+                    else:
+                        is_retarget = False
                     self.frame = temp.copy()
 
                 if not is_retarget:
