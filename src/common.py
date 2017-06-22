@@ -8,16 +8,35 @@ from tkinter.messagebox import askokcancel
 # some common function
 # convert (x0, y0, width, height) into ((x0, y0), (x1, y1)), where x1 = x0 + width; y1 = y0 + height
 convert = lambda x, y, w, h: [(int(x), int(y)), (int(x + w), int(y + h))]
+
 # add randomness to an integer
+def vary_2(x, var, flag, size):
+    if not flag:
+        return x + np.random.randint(-var, var, size)
+    else:
+        return x + abs(np.random.randint(-var, var, size))
+# random a new bounding box with a bounding box as input    
+def random_target_a(bbox, var = 35, r = 0.3, flag=False, size=(10, 1)):
+    x, y, w, h = bbox
+    # x1, y1 = vary(x, var, flag), vary(y, var, flag)
+    x1, y1, w1, h1 = vary_2(x, var, flag, size), vary_2(y, var, flag, size), vary_2(w, int(var*r), flag, size), vary_2(h, int(var*r), flag, size)
+    
+    random_candidate = np.hstack((x1, y1, w1, h1))
+    random_candidate[random_candidate < 0] = 1
+    
+    return random_candidate
+
+# # add randomness to an integer
 vary = lambda x, var, flag: x + abs(np.random.randint(-var, var)) if flag else x + np.random.randint(-var, var)
 # random a new bounding box with a bounding box as input
-def random_target(bbox, var = 35, r = 0.28, flag=False):
+def random_target(bbox, var = 32, r = 0.28, flag=False):
     x, y, w, h = bbox
     # x1, y1 = vary(x, var, flag), vary(y, var, flag)
     x1, y1, w1, h1 = vary(x, var, flag), vary(y, var, flag), vary(w, int(var*r), flag), vary(h, int(var*r), flag)
     
     return int(max(0, x1)), int(max(0, y1)), int(max(1, w1)), int(max(1, h1))
     # return int(max(0, x1)), int(max(0, y1)), w, h
+
 def random_target2(bbox, var = 30, r = 0.3, flag=False):
     x, y, w, h = bbox
     x1, y1 = vary(x, var, flag), vary(y, var, flag)
