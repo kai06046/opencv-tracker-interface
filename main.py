@@ -32,11 +32,13 @@ KEY_DELETE = ord('d')
 KEY_RETARGET = ord('r')
 KEY_MODEL = ord('m')
 KEY_MOTION = ord('b')
-KEY_UPDATE = ord('u')
+KEY_HELP = ord('h')
+# KEY_UPDATE = ord('u')
 KEY_LEFT = 2424832 # might different for different machine
 KEY_RIGHT = 2555904
 KEY_JUMP = ord('j')
 KEY_CHANGE = ord('c')
+
 
 # main logic of the tracker
 def main(track_alg):
@@ -111,10 +113,12 @@ def main(track_alg):
             beetle_tracker._pause_frame()
         elif key == KEY_MODEL:
             beetle_tracker._run_model = not beetle_tracker._run_model
-        # elif key == KEY_MOTION:
-        #     beetle_tracker._run_motion = not beetle_tracker._run_motion
-        elif key == KEY_UPDATE:
-            beetle_tracker._update = not beetle_tracker._update
+        elif key == KEY_MOTION:
+            beetle_tracker._run_motion = not beetle_tracker._run_motion
+        elif key == KEY_HELP:
+            beetle_tracker.help()
+        # elif key == KEY_UPDATE:
+        #     beetle_tracker._update = not beetle_tracker._update
         elif key == KEY_JUMP:
             beetle_tracker._jump_frame()
         elif key == KEY_CHANGE:

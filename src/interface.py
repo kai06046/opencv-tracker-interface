@@ -148,3 +148,29 @@ class Interface(object):
         showwarning('Alert', string)
         self.root.destroy()
         self.root.mainloop()
+
+    # show help setting
+    def help(self):
+        self.root = tk.Tk()
+        center(self.root) # center the widget
+        self.root.geometry('280x200')
+        # self.root.withdraw()
+        self.root.title('Settings')
+        self.root.resizable(0, 0)
+
+        ACTION = ['Add bounding box', 'Delete bounding box', 'Jump to specific frame', 'Retarget bounding box', 'Close the program',
+                 'Go to previous frame', 'Go to next frame', 'Switch of the auto add beetle model']
+        HOTKEY = ['a', 'd', 'j', 'r', 'Esc', 'LEFT', 'RIGHT', 'b']
+
+        hotkey = ttk.LabelFrame(self.root, text="Hotkey")
+        action = ttk.LabelFrame(self.root, text="Action")
+
+        # action description section
+        for i, a in enumerate(ACTION):
+            ttk.Label(action, text=a).grid(column=0, row=i, sticky=tk.W)
+            ttk.Label(hotkey, text=HOTKEY[i]).grid(column=0, row=i)
+
+        hotkey.pack(side=tk.LEFT, fill=tk.BOTH)
+        action.pack(side=tk.LEFT, fill=tk.BOTH)
+        # self.root.destroy()
+        self.root.mainloop()

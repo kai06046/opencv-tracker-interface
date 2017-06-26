@@ -14,13 +14,14 @@ KEY_UPDATE = ord('u')
 KEY_LEFT = 2424832 # might different for different machine
 KEY_RIGHT = 2555904
 KEY_JUMP = ord('j')
+KEY_HELP = ord('h')
 
 BAR_HEIGHT = 130
 TXT_COLOR = (0, 255, 255)
 MSG_COLOR = (0, 255, 255)
 WHITE = (255, 255, 255)
-FONT_SIZE_NM = 0.55
-FONT_SIZE_MG = 0.45
+FONT_SIZE_NM = 0.45
+FONT_SIZE_MG = 0.55
 FONT_SIZE_EMH = 0.75
 
 PREFIX = 'training'
@@ -361,6 +362,8 @@ class KeyHandler(BasicOperation):
                     self._run_model = not self._run_model
                 elif key_add == KEY_MOTION:
                     self._run_motion = not self._run_motion
+                elif key_add == KEY_HELP:
+                    self.help()
                 else:
                     pass
 
@@ -432,6 +435,8 @@ class KeyHandler(BasicOperation):
                 self._run_model = not self._run_model
             elif key_reset == KEY_MOTION:
                 self._run_motion = not self._run_motion
+            elif key_reset == KEY_HELP:
+                self.help()                
             # else just keep looping at current frame
             else:
                 video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
@@ -494,6 +499,8 @@ class KeyHandler(BasicOperation):
                 self._run_model = not self._run_model
             elif key_delete == KEY_MOTION:
                 self._run_motion = not self._run_motion
+            elif key_delete == KEY_HELP:
+                self.help()
             elif key_delete == KEY_ESC or (cv2.getWindowProperty(self.window_name, 0) < 0):
                 # draw current frame
                 self._draw_bbox()
@@ -558,6 +565,8 @@ class KeyHandler(BasicOperation):
                 self._run_model = not self._run_model
             elif key_pause == KEY_MOTION:
                 self._run_motion = not self._run_motion
+            elif key_pause == KEY_HELP:
+                self.help()
             elif key_pause == KEY_ESC or (cv2.getWindowProperty(self.window_name, 0) < 0):
                 # draw current frame
                 self._draw_bbox()
@@ -642,8 +651,7 @@ class KeyHandler(BasicOperation):
         
         cv2.putText(self.frame,'# %s/%s' % (int(self.count), int(self._frame_count)), (5, int(self.resolution[1]) + 50), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame,'# object %s' % self._len_bbox, (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
-        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (5, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
-        cv2.putText(self.frame, 'r (retarget)  a (add)  d (delete)  j (jump)  space (continue/pause)  <- (previouse)  -> (next)  ESC (exit)', (120, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)        
+        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view the setting'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
 
         # draw current labeling box
         if len(self._roi_pts) != 0:
