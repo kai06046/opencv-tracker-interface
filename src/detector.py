@@ -116,7 +116,7 @@ class BeetleDetector(object):
                     trace = np.array(self._record[self.object_name[bbox_ind]]['trace'])
                     
                     # last 10 diff
-                    trace_diff = np.vstack((np.diff(trace, axis=0)[::-1][:10], trace[-1] - trace[0])).tolist()
+                    trace_diff = np.vstack((np.diff(trace, axis=0)[::-1][:10], trace[-1] - trace[-min(10, len(trace))])).tolist()
                 except:
                     trace_diff = []
                 n_try = 1    
