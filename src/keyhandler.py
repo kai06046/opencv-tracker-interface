@@ -619,7 +619,8 @@ class KeyHandler(BasicOperation):
         # draw potential
         if len(self._pot_rect) > 0:
             for b in self._pot_rect:
-                cv2.rectangle(self.frame, b[0], b[1], (255, 255, 255), 2)
+                x, y, w, h = b
+                cv2.rectangle(self.frame, (x, y), (x+w, y+h), (255, 255, 255), 2)
 
         # draw bounding boxes for different condition
         if not (self._delete_box or self._retargeting):
@@ -664,7 +665,7 @@ class KeyHandler(BasicOperation):
         cv2.putText(self.frame,'# %s/%s' % (int(self.count), int(self._frame_count)), (5, int(self.resolution[1]) + 25), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame,'# object %s' % self._len_bbox, (5, int(self.resolution[1]) + 50), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         # cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   retarget model is running: %s  auto-add model is running: %s'% (self.width, self.height, (round(self.count/(time.clock() - self._start), 3) if self._start else 0), self._run_model, self._run_motion), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
-        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   retarget model is running: %s'% (self.width, self.height, (round(self.count/(time.clock() - self._start), 3) if self._start else 0), self._run_model), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
+        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   auto-retarget model is running: %s   auto-add model is running: %s'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0), self._run_model, self._run_motion), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame, 'r (retarget)  a (add)  d (delete)  j (jump)  space (continue/pause)  <- (previouse)  -> (next)  ESC (exit)', (120, int(self.resolution[1]) + 50), self.font, FONT_SIZE_MG, TXT_COLOR, 1)        
 
         # draw current labeling box

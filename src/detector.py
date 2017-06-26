@@ -9,6 +9,9 @@ import time
 
 from collections import namedtuple
 
+# for multithread
+from multiprocessing.dummy import Pool as ThreadPool
+
 # parameters for incremental training
 params = {'objective': 'binary:logistic', 'verbose': False, 
           'eval_metric': ['logloss'], 'max_depth': 3, 'eta': 0.025,
@@ -16,6 +19,8 @@ params = {'objective': 'binary:logistic', 'verbose': False,
 
 Rectangle = namedtuple('Rectangle', 'p1 p2')
 KEY_ESC = 27
+
+pool = ThreadPool(4)
 
 class BeetleDetector(object):
     # extract features for stop model
@@ -175,33 +180,18 @@ class BeetleDetector(object):
                                     continue_prop = 1 - pred[0]
                     else:
                         n_candidates = 30
-                        random_candidates = random_target_a(self._bboxes[bbox_ind], size=(n_candidates, 1)).astype('int')
-                        random_roi_feature = [self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], flag, inputShape, is_dl, is_olupdate) for r in random_candidates]
-                        random_roi_feature = np.array(random_roi_feature)
-                        pred_time = time.clock()
-                        print('predicting...')
-                        pred_random = self._model.predict(random_roi_feature)
-                        print('predict %s candidates took %s secs' % (n_candidates, round(time.clock() - pred_time)))
-                        thres = np.where(pred_random < 0.5)[0]
-                        if len(thres) > 0:
-                            print('grouping candidates')
-                            if len(thres) > 1:
-                                rects = random_candidates[thres]
-                                print(rects)
-                                gp_rects, _ = cv2.groupRectangles(rects.tolist(), min(2, len(rects) - 1), eps=1)
-                                print(gp_rects)
-                                x, y, w, h = gp_rects[0]
-                            else:
-                                x, y, w, h = random_candidates[thres][0]
-                                print(x, y, w, h)
-                            
-                            continue_prop = 1- pred_random[thres].mean()
-                        else:
-                            print('no candidates has beetle')
-                            gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
-                            x, y, w, h = gp_rects[0]
-                            continue_prop = 0
+                        x, y, w, h = self._bboxes[bbox_ind]
+                        
+                        if (w / float(h)) > 2.5:
+                            print('manual change')
+                            h = h * 1.5
+                        elif (h / float(w)) > 2.5:
+                            print('manual change')
+                            w = w * 1.5                        
 
+                        random_candidates = random_target_a((x, y, w, h), size=(n_candidates, 1)).astype('int')
+                        gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
+                        x, y, w, h = gp_rects[0]
                         cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
                         cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
                         self._draw_bbox()
@@ -212,6 +202,74 @@ class BeetleDetector(object):
                             print('break from the auto retargeting')
                             is_retarget = False
                             break
+
+                        random_roi_feature = [np.expand_dims(self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], flag, inputShape, is_dl, is_olupdate), 0) for r in random_candidates]
+                        # random_roi_feature = np.array(random_roi_feature)
+
+                        pred_time = time.clock()
+                        print('predicting...')
+                        pred_random = pool.map(self._model.predict, random_roi_feature)
+                        pred_random = np.vstack(tuple(pred_random))
+                        # pred_random = self._model.predict(random_roi_feature)
+                        print('predict %s candidates took %s secs' % (n_candidates, round(time.clock() - pred_time)))
+                        thres = np.where(pred_random < 0.5)[0]
+                        len_thres = len(thres)
+                        if len_thres > 0:
+                            
+                            if len_thres > 1:
+                                print('merging %s candidates...' % len_thres)
+                                rects = random_candidates[thres]
+                                gp_rects, _ = cv2.groupRectangles(rects.tolist(), min(2, len(rects) - 1), eps=1)
+
+                                if len(gp_rects) > 0:
+                                    x, y, w, h = gp_rects[0]
+                                else:
+                                    x, y, w, h = rects[0]
+                            else:
+                                x, y, w, h = random_candidates[thres][0]
+                            
+                            continue_prop = 1- pred_random[thres].mean()
+                        else:
+                            print('no candidates has beetle...')
+                            continue_prop = 0
+
+                        # random_candidates = random_target_a(self._bboxes[bbox_ind], size=(n_candidates, 1)).astype('int')
+                        # random_roi_feature = [self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], flag, inputShape, is_dl, is_olupdate) for r in random_candidates]
+                        # random_roi_feature = np.array(random_roi_feature)
+                        # pred_time = time.clock()
+                        # print('predicting...')
+                        # pred_random = self._model.predict(random_roi_feature)
+                        # print('predict %s candidates took %s secs' % (n_candidates, round(time.clock() - pred_time)))
+                        # thres = np.where(pred_random < 0.5)[0]
+                        # if len(thres) > 0:
+                        #     print('grouping candidates')
+                        #     if len(thres) > 1:
+                        #         rects = random_candidates[thres]
+                        #         print(rects)
+                        #         gp_rects, _ = cv2.groupRectangles(rects.tolist(), min(2, len(rects) - 1), eps=1)
+                        #         print(gp_rects)
+                        #         x, y, w, h = gp_rects[0]
+                        #     else:
+                        #         x, y, w, h = random_candidates[thres][0]
+                        #         print(x, y, w, h)
+                            
+                        #     continue_prop = 1- pred_random[thres].mean()
+                        # else:
+                        #     print('no candidates has beetle')
+                        #     gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
+                        #     x, y, w, h = gp_rects[0]
+                        #     continue_prop = 0
+
+                        # cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
+                        # cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
+                        # self._draw_bbox()
+                        # cv2.imshow(self.window_name, self.frame)
+                        # key_model = cv2.waitKey(1)
+                        
+                        # if key_model == 27:
+                        #     print('break from the auto retargeting')
+                        #     is_retarget = False
+                        #     break
 
                     # section end for using group rectangle
                     print('Probability of beetle in bounding box %s: %s' % (self.object_name[bbox_ind], round(continue_prop, 3)))
@@ -255,90 +313,45 @@ class MotionDetector(object):
 
         potential_rect = []
 
-        th = cv2.threshold(fg_mask.copy(), 230, 255, cv2.THRESH_BINARY)[1]
-        # cv2.imshow('hi', th)
-        # cv2.waitKey(1)
-        th = cv2.erode(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)))
-        
-        dilated = cv2.dilate(th, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (8, 5)), iterations=2)
+        th = cv2.threshold(fg_mask.copy(), 200, 255, cv2.THRESH_BINARY)[1]
         
         # get contours from dilated frame
-        _, contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         for c in contours:
             # get estimated bounding box of contour
             x, y, w, h = cv2.boundingRect(c)
             # calculate the area
             area = cv2.contourArea(c)
-            if area > 200 and area < 1000:
+            if area > 200 and area < 800 and x < 1200 and (w/h < 2) and (h/w < 2):
+                if area < 350:
+                    x = int(x / 1.03)
+                    y = int(y / 1.03)
+                    w = int(w * 2.2)
+                    h = int(h * 1.6)
+
                 potential_rect.append((x, y, w, h))
+
+        potential_rect = [convert(a[0], a[1], a[2], a[3]) for a in potential_rect]
+        filter_condition = [not overlapped(rect, self._roi) for rect in potential_rect]
+        potential_rect = [rect for (rect, v) in zip(potential_rect, filter_condition) if v]
+        potential_rect = [(p1[0], p1[1], p2[0]-p1[0], p2[1]-p1[1]) for p1, p2 in potential_rect]
 
         if len(potential_rect) > 0:
             
             X_potential = np.array([self.extract_features(self.orig_col.copy()[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate) for x, y, w, h in potential_rect])
             
             if is_dl:
-                pred_potential = self._model.predict(X_potential)
-                pred_potential = np.array([1 if v[0] < 0.4 else 0 for v in pred_potential])
+                pred_potential_prob = self._model.predict(X_potential)
+                print('potential has no beetle probability: %s' % pred_potential_prob)
+                pred_potential = np.array([1 if v[0] < 0.35 else 0 for v in pred_potential_prob])
             else:    
                 pred_potential = self._model.predict(xgb.DMatrix(X_potential))
                 pred_potential = np.array([1 if v < 0.5 else 0 for v in pred_potential])
 
             if any(pred_potential == 1):
                 self._pot_rect = np.array(potential_rect)[np.where(pred_potential == 1)]
-                self._pot_rect = list(self._pot_rect)
-                pot_rect_orig = self._pot_rect
-
-                temp = self.frame.copy()
-                for i, r in enumerate(self._pot_rect):
-                    x, y, w, h = r
-                    is_obj_prop = 0
-                    n_try = 0    
-                    while is_obj_prop < 0.65:
-                        x1, y1, w1, h1 = random_target(r, 50, 2, True)
-                        if (w1 / h1) > 2 or (h1 / w1) > 2:
-                            pass
-                        else:
-                            # display random bounding box
-                            cv2.rectangle(self.frame, (x1, y1), (x1+w1, y1+h1), self.color[len(self.object_name)], 2)
-                            cv2.putText(self.frame, '# detecting potential beetle %s/%s: %s/%s' % (i+1, len(self._pot_rect), n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
-                            self._draw_bbox()
-                            cv2.imshow(self.window_name, self.frame)
-                            key_model = cv2.waitKey(1)
-
-                            if key_model == 27:
-                                break
-                            random_roi_feature = [self.extract_features(self.orig_col[y1:(y1+h1), x1:(x1+w1)], flag, inputShape, is_dl, is_olupdate)]
-                            random_roi_feature = np.array(random_roi_feature)
-
-                            if is_dl:
-                                pred = self._model.predict(random_roi_feature)
-                                is_obj_prop = 1 - pred[0][0]
-                            elif not TEMP:
-                                pred = self._model.predict_proba(random_roi_feature)
-                                is_obj_prop = pred[0][0]
-                            else:
-                                pred = self._model.predict(xgb.DMatrix(random_roi_feature))
-                                is_obj_prop = 1 - pred[0]
-                        n_try += 1
-                        if n_try >= N_MAX / 2:
-                            break
-
-                        self.frame = temp.copy()
-                    if n_try < N_MAX:        
-                        r = (x1, y1, w1, h1)
-                    else:
-                        try:
-                            pot_rect_orig.pop(pot_rect_orig.index(r))
-                        except:
-                            pass
-
-                self._pot_rect = pot_rect_orig
-
-                self._pot_rect = [convert(a[0], a[1], a[2], a[3]) for a in self._pot_rect]
-                filter_condition = [not overlapped(rect, self._roi) for rect in self._pot_rect]
-                self._pot_rect = [rect for (rect, v) in zip(self._pot_rect, filter_condition) if v]
-
+                self._pot_rect = self._pot_rect.tolist()
             else:
                 self._pot_rect = []
         else:

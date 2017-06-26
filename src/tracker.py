@@ -37,7 +37,7 @@ from skimage.measure import compare_ssim
 # for deep learning model
 from keras.models import load_model
 
-args = {'model_name': 'batch_32_resnet_first_3_freeze_3', 'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False, 
+args = {'model_name': 'nadam_resnet_first_3_freeze_3', 'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False, 
         'run_model': True, 'save_pos': False, 'is_dl': True}
 
 # basic variables
@@ -82,9 +82,11 @@ class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, Motio
         self.orig_gray = None # original grayscale frame
         self.orig_col = None # original BGR frame
         self.frame = None # current frame
-        self._start = None
         self.object_name = []
         self.deleted_name = []
+        
+        self._start = None
+        self._n_pass_frame = 0
         
         # setup tracker
         self.tracker = cv2.MultiTracker(self.track_alg)
@@ -133,7 +135,7 @@ class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, Motio
         self._is_stop = None
 
         # background subtractor model, for adding potential bounding box
-        self._run_motion = False
+        self._run_motion = True
         self._bs = cv2.createBackgroundSubtractorMOG2()
         self._pot_rect =  []
 
