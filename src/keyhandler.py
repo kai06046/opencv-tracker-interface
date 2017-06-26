@@ -128,7 +128,7 @@ class BasicOperation(object):
                 self._record[self.object_name[i]]['image'].append(img)
                 self._record[self.object_name[i]]['trace'].append((x, y))
             else:
-                self._record[self.object_name[i]] = {'image': [img], 'trace':[(x, y)]}
+                self._record[self.object_name[i]] = {'image': [img], 'trace':[(x, y)], 'detect': True}
 
 class KeyHandler(BasicOperation):
 
@@ -283,6 +283,11 @@ class KeyHandler(BasicOperation):
                 self._retargeting = False
                 self._add_bboxes()
 
+    # switch of model
+    def switch(self, key):
+        try:
+            if key == ord('1'):
+                self._record[self.object_name[0]]['detect'] = not self._record[self.object_name[0]]['detect']
     # add bounding boxes
     def _add_bboxes(self):
 
