@@ -158,9 +158,9 @@ class Interface(object):
         self.root.title('Settings')
         self.root.resizable(0, 0)
 
-        ACTION = ['Add bounding box', 'Delete bounding box', 'Jump to specific frame', 'Retarget bounding box', 'Close the program',
+        ACTION = ['Add bounding box', 'Delete bounding box', 'Jump to specific frame', 'Retarget bounding box', 'Pause/Continue', 'Close the program',
                  'Go to previous frame', 'Go to next frame', 'Switch of the auto add beetle model']
-        HOTKEY = ['a', 'd', 'j', 'r', 'Esc', 'LEFT', 'RIGHT', 'b']
+        HOTKEY = ['a', 'd', 'j', 'r', 'Space', 'Esc', 'LEFT', 'RIGHT', 'b']
 
         hotkey = ttk.LabelFrame(self.root, text="Hotkey")
         action = ttk.LabelFrame(self.root, text="Action")
