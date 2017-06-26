@@ -126,7 +126,6 @@ class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, Motio
             # self._model.summary()
         else:
             if os.path.exists('model'):
-                # pass
                 self._model = pickle.load(open(find_data_file('model/%s.dat' % args['model_name']), 'rb'))
             else:
                 pass
