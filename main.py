@@ -21,7 +21,7 @@ args = {'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False,
 FLAG = args['flag_shape'] # if 1, use template size as feature
 RESIZE = (224, 224)
 TRACK_ALGORITHM = 'BOOSTING' # Other alternatives are BOOSTING, KCF, TLD, MEDIANFLOW 
-N_MAX = 80 # max number of trying to relocate the target object
+N_MAX = 20 # max number of trying to relocate the target object
 TEMP = True
 
 # keyboard return value while it was pressed
@@ -146,6 +146,7 @@ def main(track_alg):
             # if WRITE:
             # out.write(beetle_tracker.frame)
             beetle_tracker.count += 1
+            beetle_tracker._n_pass_frame += 1
         else:
             break
         # Display result
