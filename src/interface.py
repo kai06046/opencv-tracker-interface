@@ -153,7 +153,7 @@ class Interface(object):
     def help(self):
         self.root = tk.Tk()
         center(self.root) # center the widget
-        self.root.geometry('280x200')
+        self.root.geometry('280x180')
         # self.root.withdraw()
         self.root.title('Settings')
         self.root.resizable(0, 0)
