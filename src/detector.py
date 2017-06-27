@@ -2,6 +2,7 @@ from src.common import *
 import xgboost as xgb
 
 from mahotas.features import haralick, zernike
+from mahotas.thresholding import otsu
 from skimage.feature import hog
 import cv2
 import warnings
@@ -489,4 +490,20 @@ class OnlineUpdateDetector(object):
 
             self._model = xgb.train(params, xg_train, 50, xgb_model = self._model)
             print('Model updated')        
+
+class RatDetector(object):
+
+    def detect_rat_contour(self):
+
+        blurred = cv2.GaussianBlur(self.orig_gray, (5, 5), 0)
+
+        # otsu
+        T = otsu(blurred)
+        th = self.orig_gray.copy()
+        th[th > T] = 255
+        th[th < 255] = 0
+        _, cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # find contour with the biggest area
+        self.rat_cnt = sorted(cnts, key=cv2.contourArea)[-1]
+
 
