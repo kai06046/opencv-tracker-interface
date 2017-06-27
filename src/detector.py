@@ -99,7 +99,7 @@ class BeetleDetector(object):
         #     if v:
         #         stop_obj.append(i)
 
-        prediction[is_overlapped] = 0
+        # prediction[is_overlapped] = 0
 
         # if any bounding box has value 1, resampling candidates of bounding box
         if any(prediction == 1):
@@ -109,9 +109,16 @@ class BeetleDetector(object):
             temp = self.frame.copy()
 
             for bbox_ind in np.where(prediction == 1)[0]:
+                
                 orig_prob = pred[bbox_ind][0] # current bounding box index background probability
 
-                continue_prop = 0
+                # switch on/off for detector
+                if self._record[self.object_name[i]]['detect']:
+                    continue_prop = 0
+                else:
+                    continue_prop = 1
+                    is_retarget = False
+
                 try:
                     trace = np.array(self._record[self.object_name[bbox_ind]]['trace'])
                     
@@ -204,13 +211,11 @@ class BeetleDetector(object):
                             break
 
                         random_roi_feature = [np.expand_dims(self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], flag, inputShape, is_dl, is_olupdate), 0) for r in random_candidates]
-                        # random_roi_feature = np.array(random_roi_feature)
 
                         pred_time = time.clock()
                         print('predicting...')
                         pred_random = pool.map(self._model.predict, random_roi_feature)
                         pred_random = np.vstack(tuple(pred_random))
-                        # pred_random = self._model.predict(random_roi_feature)
                         print('predict %s candidates took %s secs' % (n_candidates, round(time.clock() - pred_time)))
                         thres = np.where(pred_random < 0.5)[0]
                         len_thres = len(thres)
@@ -233,50 +238,10 @@ class BeetleDetector(object):
                             print('no candidates has beetle...')
                             continue_prop = 0
 
-                        # random_candidates = random_target_a(self._bboxes[bbox_ind], size=(n_candidates, 1)).astype('int')
-                        # random_roi_feature = [self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], flag, inputShape, is_dl, is_olupdate) for r in random_candidates]
-                        # random_roi_feature = np.array(random_roi_feature)
-                        # pred_time = time.clock()
-                        # print('predicting...')
-                        # pred_random = self._model.predict(random_roi_feature)
-                        # print('predict %s candidates took %s secs' % (n_candidates, round(time.clock() - pred_time)))
-                        # thres = np.where(pred_random < 0.5)[0]
-                        # if len(thres) > 0:
-                        #     print('grouping candidates')
-                        #     if len(thres) > 1:
-                        #         rects = random_candidates[thres]
-                        #         print(rects)
-                        #         gp_rects, _ = cv2.groupRectangles(rects.tolist(), min(2, len(rects) - 1), eps=1)
-                        #         print(gp_rects)
-                        #         x, y, w, h = gp_rects[0]
-                        #     else:
-                        #         x, y, w, h = random_candidates[thres][0]
-                        #         print(x, y, w, h)
-                            
-                        #     continue_prop = 1- pred_random[thres].mean()
-                        # else:
-                        #     print('no candidates has beetle')
-                        #     gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
-                        #     x, y, w, h = gp_rects[0]
-                        #     continue_prop = 0
-
-                        # cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
-                        # cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
-                        # self._draw_bbox()
-                        # cv2.imshow(self.window_name, self.frame)
-                        # key_model = cv2.waitKey(1)
-                        
-                        # if key_model == 27:
-                        #     print('break from the auto retargeting')
-                        #     is_retarget = False
-                        #     break
-
                     # section end for using group rectangle
                     print('Probability of beetle in bounding box %s: %s' % (self.object_name[bbox_ind], round(continue_prop, 3)))
                     n_try += 1
                     if n_try >= N_MAX:
-                        # self._n = bbox_ind
-                        # is_retarget = self._ask_retarget_box()
                         break
                     else:
                         is_retarget = False
