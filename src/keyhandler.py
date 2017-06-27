@@ -378,6 +378,9 @@ class KeyHandler(BasicOperation):
                     self._run_motion = not self._run_motion
                 elif key_add == KEY_HELP:
                     self.help()
+                # friendly switch on off for detector
+                elif key_add in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                    self.switch(key)
                 else:
                     pass
 
@@ -451,6 +454,9 @@ class KeyHandler(BasicOperation):
                 self._run_motion = not self._run_motion
             elif key_reset == KEY_HELP:
                 self.help()                
+            # friendly switch on off for detector
+            elif key_reset in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                self.switch(key)
             # else just keep looping at current frame
             else:
                 video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
@@ -525,6 +531,9 @@ class KeyHandler(BasicOperation):
                 else:
                     cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
                     cv2.setMouseCallback(self.window_name, self._mouse_ops)
+            # friendly switch on off for detector
+            elif key_delete in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                self.switch(key)
             else:
                 self.frame = self.orig_col.copy()
 
@@ -591,6 +600,9 @@ class KeyHandler(BasicOperation):
                 else:
                     cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
                     cv2.setMouseCallback(self.window_name, self._mouse_ops)
+            # friendly switch on off for detector
+            elif key_pause in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                self.switch(key)
             else:
                 self.frame = self.orig_col.copy()
 
@@ -672,7 +684,7 @@ class KeyHandler(BasicOperation):
                 x, y, w, h = 5 + i * 125, int(self.resolution[1]) + 33, 100, 20
                 rect = np.array( [[[x, y],[x+w,y],[x+w,y+h],[x,y+h]]], dtype=np.int32 )
                 cv2.fillPoly(self.frame, rect, c)
-                cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[i], 3)
+                cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[i], 2)
                 
                 # cv2.putText(self.frame, name, (5 + i * 30, int(self.resolution[1]) + 50), self.font, FONT_SIZE_EMH * 1.2, c, 1)
         else:
@@ -681,7 +693,7 @@ class KeyHandler(BasicOperation):
         # draw basic information
         cv2.putText(self.frame,'# %s/%s' % (int(self.count), int(self._frame_count)), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame,'# object %s' % self._len_bbox, (5, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
-        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view the setting'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
+        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view Settings'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
 
         # draw current labeling box
         if len(self._roi_pts) != 0:
