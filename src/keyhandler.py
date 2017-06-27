@@ -607,8 +607,6 @@ class KeyHandler(BasicOperation):
         cv2.putText(self.frame, 'RETARGET', (340, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, WHITE, 1)
         cv2.putText(self.frame, 'DELETE', (495, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, WHITE, 1)
         cv2.putText(self.frame, 'AUTOADD', (615, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR if self._run_motion else WHITE, 1)
-        cv2.putText(self.frame, 'AUTORETARGET', (765, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR if self._run_model else WHITE, 1)
-        
 
         # draw potential bounding box that has target object
         if len(self._pot_rect) > 0:
@@ -674,8 +672,8 @@ class KeyHandler(BasicOperation):
                 x, y, w, h = 5 + i * 125, int(self.resolution[1]) + 33, 100, 20
                 rect = np.array( [[[x, y],[x+w,y],[x+w,y+h],[x,y+h]]], dtype=np.int32 )
                 cv2.fillPoly(self.frame, rect, c)
-
-                # cv2.rectangle(self.frame, (5 + i * 30, int(self.resolution[1]) + 50), b[1], c, 1)
+                cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[i], 3)
+                
                 # cv2.putText(self.frame, name, (5 + i * 30, int(self.resolution[1]) + 50), self.font, FONT_SIZE_EMH * 1.2, c, 1)
         else:
             cv2.putText(self.frame, 'NO OBJECT', (5, int(self.resolution[1] + 50)), self.font, FONT_SIZE_EMH, WHITE, 1)
