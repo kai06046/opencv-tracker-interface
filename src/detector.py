@@ -114,12 +114,15 @@ class BeetleDetector(object):
                 orig_prob = pred[bbox_ind][0] # current bounding box index background probability
 
                 # switch on/off for detector
-                if self._record[self.object_name[bbox_ind]]['detect']:
-                    continue_prop = 0
+                if self.object_name[bbox_ind] in self._record.keys():
+                    if self._record[self.object_name[bbox_ind]]['detect']:
+                        continue_prop = 0
+                    else:
+                        continue_prop = 1
+                        is_retarget = False
+                        x, y, w, h = self._bboxes[bbox_ind]
                 else:
-                    continue_prop = 1
-                    is_retarget = False
-                    x, y, w, h = self._bboxes[bbox_ind]
+                    continue_prop = 0
 
                 try:
                     trace = np.array(self._record[self.object_name[bbox_ind]]['trace'])
@@ -505,5 +508,3 @@ class RatDetector(object):
         _, cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # find contour with the biggest area
         self.rat_cnt = sorted(cnts, key=cv2.contourArea)[-1]
-
-
