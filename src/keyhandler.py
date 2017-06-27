@@ -380,7 +380,7 @@ class KeyHandler(BasicOperation):
                     self.help()
                 # friendly switch on off for detector
                 elif key_add in [ord('1'), ord('2'), ord('3'), ord('4')]:
-                    self.switch(key)
+                    self.switch(key_add)
                 else:
                     pass
 
@@ -456,7 +456,7 @@ class KeyHandler(BasicOperation):
                 self.help()                
             # friendly switch on off for detector
             elif key_reset in [ord('1'), ord('2'), ord('3'), ord('4')]:
-                self.switch(key)
+                self.switch(key_reset)
             # else just keep looping at current frame
             else:
                 video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
@@ -533,7 +533,7 @@ class KeyHandler(BasicOperation):
                     cv2.setMouseCallback(self.window_name, self._mouse_ops)
             # friendly switch on off for detector
             elif key_delete in [ord('1'), ord('2'), ord('3'), ord('4')]:
-                self.switch(key)
+                self.switch(key_delete)
             else:
                 self.frame = self.orig_col.copy()
 
@@ -602,7 +602,7 @@ class KeyHandler(BasicOperation):
                     cv2.setMouseCallback(self.window_name, self._mouse_ops)
             # friendly switch on off for detector
             elif key_pause in [ord('1'), ord('2'), ord('3'), ord('4')]:
-                self.switch(key)
+                self.switch(key_pause)
             else:
                 self.frame = self.orig_col.copy()
 
