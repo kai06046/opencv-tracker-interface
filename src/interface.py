@@ -89,13 +89,12 @@ class Interface(object):
         if len(self._pot_rect) != 0:    
             self.root = tk.Tk()
             self.root.withdraw()
-            if askyesno('Add bounding box', 'Do you wanna add a bouding box?', icon='info'):
-                self.root.destroy()
-                self._add_bboxes()
-            else:
-                self.root.destroy()
+            result = askyesno('Add bounding box', 'Do you wanna add a bouding box?', icon='info')
+            self.root.destroy()
             self.root.mainloop()
-
+            if result:
+                self._add_bboxes()
+                
     # ask whether to delele box
     def _ask_delete_box(self):
 
