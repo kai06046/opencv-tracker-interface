@@ -113,11 +113,12 @@ class BeetleDetector(object):
                 orig_prob = pred[bbox_ind][0] # current bounding box index background probability
 
                 # switch on/off for detector
-                if self._record[self.object_name[i]]['detect']:
+                if self._record[self.object_name[bbox_ind]]['detect']:
                     continue_prop = 0
                 else:
                     continue_prop = 1
                     is_retarget = False
+                    x, y, w, h = self._bboxes[bbox_ind]
 
                 try:
                     trace = np.array(self._record[self.object_name[bbox_ind]]['trace'])
@@ -250,7 +251,7 @@ class BeetleDetector(object):
                 if not is_retarget:
                     # reset bounding box with highest probability
                     if n_try != N_MAX:
-                        self._bboxes[bbox_ind] = (x, y, w, h)
+                        self._bboxes[bbox_ind] = [x, y, w, h]
                         print('Done auto retargeting %s...' % (self.object_name[bbox_ind]))
                     # delete bounding box if the number of randomly retargeting exceeds 5000 times
                     else:
