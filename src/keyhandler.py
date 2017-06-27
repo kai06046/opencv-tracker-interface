@@ -288,6 +288,15 @@ class KeyHandler(BasicOperation):
         try:
             if key == ord('1'):
                 self._record[self.object_name[0]]['detect'] = not self._record[self.object_name[0]]['detect']
+            elif key == ord('2'):
+                self._record[self.object_name[1]]['detect'] = not self._record[self.object_name[1]]['detect']
+            elif key == ord('3'):
+                self._record[self.object_name[2]]['detect'] = not self._record[self.object_name[2]]['detect']
+            elif key == ord('4'):
+                self._record[self.object_name[3]]['detect'] = not self._record[self.object_name[3]]['detect']
+        except:
+            print('No rules for %s' % key)
+
     # add bounding boxes
     def _add_bboxes(self):
 
