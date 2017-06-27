@@ -21,7 +21,7 @@ args = {'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False,
 FLAG = args['flag_shape'] # if 1, use template size as feature
 RESIZE = (224, 224)
 TRACK_ALGORITHM = 'BOOSTING' # Other alternatives are BOOSTING, KCF, TLD, MEDIANFLOW 
-N_MAX = 80 # max number of trying to relocate the target object
+N_MAX = 20 # max number of trying to relocate the target object
 TEMP = True
 
 # keyboard return value while it was pressed
@@ -32,7 +32,8 @@ KEY_DELETE = ord('d')
 KEY_RETARGET = ord('r')
 KEY_MODEL = ord('m')
 KEY_MOTION = ord('b')
-KEY_UPDATE = ord('u')
+KEY_HELP = ord('h')
+# KEY_UPDATE = ord('u')
 KEY_LEFT = 2424832 # might different for different machine
 KEY_RIGHT = 2555904
 KEY_JUMP = ord('j')
@@ -111,15 +112,21 @@ def main(track_alg):
             beetle_tracker._pause_frame()
         elif key == KEY_MODEL:
             beetle_tracker._run_model = not beetle_tracker._run_model
-        # elif key == KEY_MOTION:
-        #     beetle_tracker._run_motion = not beetle_tracker._run_motion
-        elif key == KEY_UPDATE:
-            beetle_tracker._update = not beetle_tracker._update
+        elif key == KEY_MOTION:
+            beetle_tracker._run_motion = not beetle_tracker._run_motion
+        elif key == KEY_HELP:
+            beetle_tracker.help()
+        # elif key == KEY_UPDATE:
+        #     beetle_tracker._update = not beetle_tracker._update
         elif key == KEY_JUMP:
             beetle_tracker._jump_frame()
+        # restart the program
         elif key == KEY_CHANGE:
         	cv2.destroyAllWindows()
         	main(track_alg=TRACK_ALGORITHM)
+        # friendly switch on off for detector
+        elif key in [ord('1'), ord('2'), ord('3'), ord('4')]:
+            beetle_tracker.switch(key)
         # otherwise, update bounding boxes from tracker
         else:
             ok, beetle_tracker._bboxes = beetle_tracker.tracker.update(beetle_tracker.frame)
@@ -146,6 +153,7 @@ def main(track_alg):
             # if WRITE:
             # out.write(beetle_tracker.frame)
             beetle_tracker.count += 1
+            beetle_tracker._n_pass_frame += 1
         else:
             break
         # Display result
