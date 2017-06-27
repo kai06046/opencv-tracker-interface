@@ -695,6 +695,10 @@ class KeyHandler(BasicOperation):
         cv2.putText(self.frame,'# object %s' % self._len_bbox, (5, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view Settings'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
 
+        # draw rat contour
+        if len(self.rat_cnt) > 0:
+            cv2.drawContours(self.frame, self.rat_cnt, -1, (216, 233, 62), 2)
+            self.rat_cnt = []
         # draw current labeling box
         if len(self._roi_pts) != 0:
 
