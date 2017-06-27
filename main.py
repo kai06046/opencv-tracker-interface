@@ -39,7 +39,6 @@ KEY_RIGHT = 2555904
 KEY_JUMP = ord('j')
 KEY_CHANGE = ord('c')
 
-
 # main logic of the tracker
 def main(track_alg):
     warnings.filterwarnings('ignore')
@@ -121,9 +120,13 @@ def main(track_alg):
         #     beetle_tracker._update = not beetle_tracker._update
         elif key == KEY_JUMP:
             beetle_tracker._jump_frame()
+        # restart the program
         elif key == KEY_CHANGE:
         	cv2.destroyAllWindows()
         	main(track_alg=TRACK_ALGORITHM)
+        # friendly switch on off for detector
+        elif key in [ord('1'), ord('2'), ord('3'), ord('4')]:
+            beetle_tracker.switch(key)
         # otherwise, update bounding boxes from tracker
         else:
             ok, beetle_tracker._bboxes = beetle_tracker.tracker.update(beetle_tracker.frame)
