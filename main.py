@@ -149,11 +149,13 @@ def main(track_alg):
             beetle_tracker.frame = beetle_tracker.orig_col.copy()
             # draw current frame
             beetle_tracker._draw_bbox()
+            # append trace and img
+            beetle_tracker._append_record()
             # save image inside the bounding boxes
             beetle_tracker._write_bboxes()
             if args['save_pos'] and len(beetle_tracker.object_name) > 0:
                 beetle_tracker._save_pos()
-            beetle_tracker._append_record()
+            
             # write current frame to output video
             # if WRITE:
             # out.write(beetle_tracker.frame)
