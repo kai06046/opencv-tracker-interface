@@ -157,7 +157,7 @@ class Interface(object):
         self.root.title('Settings')
         self.root.resizable(0, 0)
 
-        ACTION = ['Add bounding box', 'Delete bounding box', 'Jump to specific frame', 'Retarget bounding box', 'Pause/Continue', 'Close the program',
+        ACTION = ['Add bounding box', 'Delete bounding box', 'Jump to specific frame', 'Retarget bounding box', 'Pause/Continue', 'Close the program/Break from auto retarget',
                  'Go to previous frame', 'Go to next frame', 'Switch of the auto add beetle model', 'Switch on/off of auto retarget', 'Switch on/off of showing rat']
         HOTKEY = ['a', 'd', 'j', 'r', 'Space', 'Esc', 'LEFT', 'RIGHT', 'b',  '1/2/3/4', 'z']
 
