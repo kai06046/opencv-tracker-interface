@@ -652,9 +652,13 @@ class KeyHandler(BasicOperation):
                 # change status color
                 cv2.putText(self.frame, 'TRACKING', (5, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
             for i, b in enumerate(self._roi):
-
+                try:
+                    str_on_rat = 'O' if self.detect_on_rat(self._bboxes[i]) else 'X'
+                except Exception as e:
+                    print(e)
+                    str_on_rat = ''
                 cv2.rectangle(self.frame, b[0], b[1], self.color[i], 2)
-                cv2.putText(self.frame, '%s' % (self.object_name[i]), (b[0][0], b[0][1] - 10), self.font, FONT_SIZE_NM, self.color[i], 1)
+                cv2.putText(self.frame, '%s (%s)' % (self.object_name[i], str_on_rat), (b[0][0], b[0][1] - 10), self.font, FONT_SIZE_NM, self.color[i], 1)
         else:
             if self._delete_box:
                 cv2.putText(self.frame, 'Delete bounding box', (self._mv_pt[0], self._mv_pt[1] + 5), self.font, FONT_SIZE_NM, self.color[self._n], 1)
@@ -678,10 +682,13 @@ class KeyHandler(BasicOperation):
                 else:
                     thickness = 2
                     font_thick = 1
-                
+                try:
+                    str_on_rat = 'O' if self.detect_on_rat(self._bboxes[i]) else 'X'
+                except:
+                    str_on_rat = ''
                 cv2.rectangle(self.frame, b[0], b[1], self.color[i], thickness)
                 cv2.putText(self.frame, 'Current retarget object: %s' % np.array(self.object_name)[int(self._n)], (5, 15), self.font, FONT_SIZE_NM, TXT_COLOR, 1)
-                cv2.putText(self.frame, '%s' % (self.object_name[i]), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], font_thick)
+                cv2.putText(self.frame, '%s (%s)' % (self.object_name[i], str_on_rat), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], font_thick)
 
         # draw the switch of detector for each object
         if len(self.object_name) > 0:
