@@ -7,6 +7,7 @@ from skimage.feature import hog
 import cv2
 import warnings
 import time
+import matplotlib.path as mplPath
 
 from collections import namedtuple
 
@@ -165,7 +166,7 @@ class BeetleDetector(object):
                             key_model = cv2.waitKey(1)
 
                             if key_model == 27:
-                                print('break from the auto retargeting')
+                                print('break from the auto retargeting by trace')
                                 is_retarget = False
                                 break
                                 # return False, None
@@ -203,7 +204,9 @@ class BeetleDetector(object):
 
                         random_candidates = random_target_a((x, y, w, h), size=(n_candidates, 1)).astype('int')
                         gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
+                        gp_rects.astype('int')
                         x, y, w, h = gp_rects[0]
+                        # x, y, w, h = int(x), int(y), int(w), int(h)
                         cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
                         cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
                         self._draw_bbox()
@@ -230,7 +233,7 @@ class BeetleDetector(object):
                                 print('merging %s candidates...' % len_thres)
                                 rects = random_candidates[thres]
                                 gp_rects, _ = cv2.groupRectangles(rects.tolist(), min(2, len(rects) - 1), eps=1)
-
+                                gp_rects.astype('int')
                                 if len(gp_rects) > 0:
                                     x, y, w, h = gp_rects[0]
                                 else:
@@ -508,3 +511,19 @@ class RatDetector(object):
         _, cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # find contour with the biggest area
         self.rat_cnt = sorted(cnts, key=cv2.contourArea)[-1]
+
+    def detect_on_rat(self, bbox):
+        x1, y1, w, h = bbox
+        x2, y2 = x1 + w, y1 + h
+        try:
+            cnt = self.rat_cnt.reshape(len(self.rat_cnt), 2)
+            poly = mplPath.Path(cnt)
+            on_rat = False
+            for x in [x1, x2]:
+                for y in [y1, y2]:
+                    on_rat = on_rat or poly.contains_point((x, y))
+            on_rat = on_rat or any((cnt[:, 1] > b[0][1]) & (cnt[:, 1] < b[1][1]) & (cnt[:, 0] > b[0][0]) & (cnt[:, 0] < b[1][0]))
+        except Exception as e:
+            print(e)
+            on_rat = 'No'
+        return on_rat
