@@ -75,8 +75,7 @@ def main(track_alg):
             break
         # resize the frame into 960 x 720
         beetle_tracker._init_frame()
-        if beetle_tracker._show_rat:
-            beetle_tracker.detect_rat_contour()
+        beetle_tracker.detect_rat_contour()
         
         if len(beetle_tracker._roi) > 0:
             beetle_tracker._roi = [convert(a[0], a[1], a[2], a[3]) for a in beetle_tracker._bboxes]
