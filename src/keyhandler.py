@@ -63,17 +63,22 @@ class BasicOperation(object):
     def _read_bboxes(self):
 
         txt_name = '%s.txt' % self.video_name
-        try:
-            nframe, n_obj, bboxes, self.object_name = eval(getlines(txt_name, self.count - 1))   
-        except:
-            file_len = len(open(txt_name, 'r').readlines())
-            with open(txt_name, 'r') as nf:
-                data = nf.readlines()
-                line_temp = ['[%s, %s, [], []]\n' % (c, 0) for c in range(file_len + 1, self.count + 1)]
-                data = data + line_temp
+        if os.path.isfile(txt_name):
+            try:
+                nframe, n_obj, bboxes, self.object_name, self.on_rat = eval(getlines(txt_name, self.count - 1))   
+            except:
+                file_len = len(open(txt_name, 'r').readlines())
+                with open(txt_name, 'r') as nf:
+                    data = nf.readlines()
+                    line_temp = ['[%s, %s, [], [], []]\n' % (c, 0) for c in range(file_len + 1, self.count + 1)]
+                    data = data + line_temp
+                with open(txt_name, 'w') as nf:
+                    nf.writelines(data)
+                nframe, n_obj, bboxes, self.object_name, self.on_rat = eval(getlines(txt_name, self.count - 1))   
+        else:
+            line_temp = ['[%s, %s, [], [], []]\n' % (c, 0) for c in range(1, self.count + 1)]
             with open(txt_name, 'w') as nf:
-                nf.writelines(data)
-            nframe, n_obj, bboxes, self.object_name = eval(getlines(txt_name, self.count - 1))   
+                nframe, n_obj, bboxes, self.object_name, self.on_rat = eval(getlines(txt_name, self.count - 1))
 
         self._bboxes = np.array(bboxes)
         self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
@@ -101,7 +106,7 @@ class BasicOperation(object):
                     try:
                         data[self.count - 1] = line
                     except:
-                        line_temp = ['[%s, %s, [], []]\n' % (c, 0) for c in range(file_len + 1, self.count + 1)]
+                        line_temp = ['[%s, %s, [], [], []]\n' % (c, 0) for c in range(file_len + 1, self.count + 1)]
                         data = data + line_temp
                         data[self.count - 1] = line
                 with open(txt_name, 'w') as nf:
@@ -121,7 +126,8 @@ class BasicOperation(object):
     # initialize multi tracker
     def _initialize_tracker(self):
         self.tracker = cv2.MultiTracker(self.track_alg)
-        self.tracker.add(self.frame, tuple(self._bboxes))
+        if len(self._bboxes) > 0:
+            self.tracker.add(self.frame, tuple(self._bboxes))
 
     # append meta data of tracking
     def _append_record(self):
@@ -634,7 +640,7 @@ class KeyHandler(BasicOperation):
         cv2.putText(self.frame, 'PAUSE', (230, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, WHITE, 1)
         cv2.putText(self.frame, 'RETARGET', (340, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, WHITE, 1)
         cv2.putText(self.frame, 'DELETE', (495, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, WHITE, 1)
-        cv2.putText(self.frame, 'AUTOADD', (615, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR if self._run_motion else WHITE, 1)
+        cv2.putText(self.frame, 'AUTOADD', (615, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR if self._run_motion else WHITE, 2 if self._run_motion else 1)
 
         # draw potential bounding box that has target object
         if len(self._pot_rect) > 0:
@@ -653,13 +659,13 @@ class KeyHandler(BasicOperation):
                 else:
                     cv2.putText(self.frame, 'Draw a rectangle to start tracking', (120, int(self.resolution[1] + 75)), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
                 # change status color
-                cv2.putText(self.frame, 'ADD', (155, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                cv2.putText(self.frame, 'ADD', (155, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
             elif self._pause:
                 # change status color
-                cv2.putText(self.frame, 'PAUSE', (230, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                cv2.putText(self.frame, 'PAUSE', (230, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
             else:
                 # change status color
-                cv2.putText(self.frame, 'TRACKING', (5, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                cv2.putText(self.frame, 'TRACKING', (5, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
             for i, b in enumerate(self._roi):
                 try:
                     str_on_rat = 'O' if self.detect_on_rat(self._bboxes[i]) else 'X'
@@ -673,12 +679,12 @@ class KeyHandler(BasicOperation):
                 cv2.putText(self.frame, 'Delete bounding box', (self._mv_pt[0], self._mv_pt[1] + 5), self.font, FONT_SIZE_NM, self.color[self._n], 1)
                 cv2.putText(self.frame, 'Double click the bounding box to delete', (120, int(self.resolution[1]) + 75), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
                 # change status color
-                cv2.putText(self.frame, 'DELETE', (495, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                cv2.putText(self.frame, 'DELETE', (495, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
             elif self._retargeting:
                 cv2.putText(self.frame, 'Retarget bounding box', (self._mv_pt[0], self._mv_pt[1] + 5), self.font, FONT_SIZE_NM, self.color[self._n], 1)
                 cv2.putText(self.frame, 'Retarget by drawing a new rectangle', (120, int(self.resolution[1]) + 75), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
                 # change status color
-                cv2.putText(self.frame, 'RETARGET', (340, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                cv2.putText(self.frame, 'RETARGET', (340, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
                 if self._is_stop:
                     string = "Detect that there is no beetle in %s!" % (np.array(self.object_name)[self._stop_obj])
                     cv2.putText(self.frame, string, (5,40), self.font, FONT_SIZE_NM, TXT_COLOR, 1)
