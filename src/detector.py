@@ -515,6 +515,7 @@ class RatDetector(object):
     def detect_on_rat(self, bbox):
         x1, y1, w, h = bbox
         x2, y2 = x1 + w, y1 + h
+        print(self.rat_cnt)
         try:
             cnt = self.rat_cnt.reshape(len(self.rat_cnt), 2)
             poly = mplPath.Path(cnt)
@@ -525,5 +526,5 @@ class RatDetector(object):
             on_rat = on_rat or any((cnt[:, 1] > b[0][1]) & (cnt[:, 1] < b[1][1]) & (cnt[:, 0] > b[0][0]) & (cnt[:, 0] < b[1][0]))
         except Exception as e:
             print(e)
-            on_rat = 'No'
+            on_rat = False
         return on_rat
