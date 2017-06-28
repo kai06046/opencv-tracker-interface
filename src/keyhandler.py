@@ -2,6 +2,7 @@ import cv2, time
 from src.common import *
 import tkinter as tk
 from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
+
 # keyboard return value while it was pressed
 KEY_CONTINUE = ord(' ')
 KEY_ESC = 27
@@ -88,7 +89,7 @@ class BasicOperation(object):
             file_len = 0
 
         with open(txt_name, 'a') as f:
-            line = '[%s, %s, %s, %s]\n' % (self.count, len(self._bboxes), [list(b) for b in self._bboxes], self.object_name)
+            line = '[%s, %s, %s, %s, %s]\n' % (self.count, len(self._bboxes), [list(b) for b in self._bboxes], self.object_name, self.on_rat)
 
             if self.count == (file_len + 1):
                 f.write(line)
@@ -113,6 +114,9 @@ class BasicOperation(object):
                 line = '%s\n' % self.count
                 f.write(line)
 
+        # reinitialize on rat list
+        self.on_rat = []
+
     # initialize multi tracker
     def _initialize_tracker(self):
         self.tracker = cv2.MultiTracker(self.track_alg)
@@ -124,6 +128,9 @@ class BasicOperation(object):
             x, y, w, h = b
             x, y, w, h = int(x), int(y), int(w), int(h)
             img = self.orig_gray[y:(y+h), x:(x+w)].copy()
+            on_rat = self.detect_on_rat(b)
+            self.on_rat.append(on_rat)
+
             if self.object_name[i] in self._record.keys():
                 self._record[self.object_name[i]]['image'].append(img)
                 self._record[self.object_name[i]]['trace'].append((x, y))
@@ -645,6 +652,7 @@ class KeyHandler(BasicOperation):
                 # change status color
                 cv2.putText(self.frame, 'TRACKING', (5, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
             for i, b in enumerate(self._roi):
+
                 cv2.rectangle(self.frame, b[0], b[1], self.color[i], 2)
                 cv2.putText(self.frame, '%s' % (self.object_name[i]), (b[0][0], b[0][1] - 10), self.font, FONT_SIZE_NM, self.color[i], 1)
         else:
@@ -670,6 +678,7 @@ class KeyHandler(BasicOperation):
                 else:
                     thickness = 2
                     font_thick = 1
+                
                 cv2.rectangle(self.frame, b[0], b[1], self.color[i], thickness)
                 cv2.putText(self.frame, 'Current retarget object: %s' % np.array(self.object_name)[int(self._n)], (5, 15), self.font, FONT_SIZE_NM, TXT_COLOR, 1)
                 cv2.putText(self.frame, '%s' % (self.object_name[i]), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], font_thick)
@@ -684,9 +693,7 @@ class KeyHandler(BasicOperation):
                 x, y, w, h = 5 + i * 125, int(self.resolution[1]) + 33, 100, 20
                 rect = np.array( [[[x, y],[x+w,y],[x+w,y+h],[x,y+h]]], dtype=np.int32 )
                 cv2.fillPoly(self.frame, rect, c)
-                cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[i], 2)
-                
-                # cv2.putText(self.frame, name, (5 + i * 30, int(self.resolution[1]) + 50), self.font, FONT_SIZE_EMH * 1.2, c, 1)
+                cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[i], 2)                
         else:
             cv2.putText(self.frame, 'NO OBJECT', (5, int(self.resolution[1] + 50)), self.font, FONT_SIZE_EMH, WHITE, 1)
 
@@ -696,9 +703,9 @@ class KeyHandler(BasicOperation):
         cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view Settings'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
 
         # draw rat contour
-        if len(self.rat_cnt) > 0:
+        if len(self.rat_cnt) > 0 and self._show_rat:
             cv2.drawContours(self.frame, self.rat_cnt, -1, (216, 233, 62), 2)
-            self.rat_cnt = []
+            
         # draw current labeling box
         if len(self._roi_pts) != 0:
 
