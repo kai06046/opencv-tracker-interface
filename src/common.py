@@ -51,7 +51,7 @@ def getlines(txt, n_line):
     try: 
         line = lines[n_line]
     except:
-        line = '[%s, 0, []]' % int(n_line + 1)
+        line = '[%s, 0, [], [], []]' % int(n_line + 1)
     return line
 # see if a points is inside a rectangle
 def in_rect(pt, rect):  
