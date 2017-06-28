@@ -89,12 +89,11 @@ class Interface(object):
         if len(self._pot_rect) != 0:    
             self.root = tk.Tk()
             self.root.withdraw()
-            if askyesno('Add bounding box', 'Do you wanna add a bouding box?', icon='info'):
-                self.root.destroy()
-                self._add_bboxes()
-            else:
-                self.root.destroy()
+            result = askyesno('Add bounding box', 'Do you wanna add a bouding box?', icon='info')
+            self.root.destroy()
             self.root.mainloop()
+            if result:
+                self._add_bboxes()
 
     # ask whether to delele box
     def _ask_delete_box(self):
@@ -153,14 +152,14 @@ class Interface(object):
     def help(self):
         self.root = tk.Tk()
         center(self.root) # center the widget
-        self.root.geometry('280x180')
+        self.root.geometry('320x250')
         # self.root.withdraw()
         self.root.title('Settings')
         self.root.resizable(0, 0)
 
-        ACTION = ['Add bounding box', 'Delete bounding box', 'Jump to specific frame', 'Retarget bounding box', 'Pause/Continue', 'Close the program',
-                 'Go to previous frame', 'Go to next frame', 'Switch of the auto add beetle model']
-        HOTKEY = ['a', 'd', 'j', 'r', 'Space', 'Esc', 'LEFT', 'RIGHT', 'b']
+        ACTION = ['Add bounding box', 'Delete bounding box', 'Jump to specific frame', 'Retarget bounding box', 'Pause/Continue', 'Close the program/Break from auto retarget',
+                 'Go to previous frame', 'Go to next frame', 'Switch of the auto add beetle model', 'Switch on/off of auto retarget', 'Switch on/off of showing rat']
+        HOTKEY = ['a', 'd', 'j', 'r', 'Space', 'Esc', 'LEFT', 'RIGHT', 'b',  '1/2/3/4', 'z']
 
         hotkey = ttk.LabelFrame(self.root, text="Hotkey")
         action = ttk.LabelFrame(self.root, text="Action")

@@ -38,6 +38,7 @@ KEY_LEFT = 2424832 # might different for different machine
 KEY_RIGHT = 2555904
 KEY_JUMP = ord('j')
 KEY_CHANGE = ord('c')
+KEY_RAT = ord('z')
 
 # main logic of the tracker
 def main(track_alg):
@@ -74,6 +75,7 @@ def main(track_alg):
             break
         # resize the frame into 960 x 720
         beetle_tracker._init_frame()
+        beetle_tracker.detect_rat_contour()
         
         if len(beetle_tracker._roi) > 0:
             beetle_tracker._roi = [convert(a[0], a[1], a[2], a[3]) for a in beetle_tracker._bboxes]
@@ -127,6 +129,8 @@ def main(track_alg):
         # friendly switch on off for detector
         elif key in [ord('1'), ord('2'), ord('3'), ord('4')]:
             beetle_tracker.switch(key)
+        elif key == KEY_RAT:
+            beetle_tracker._show_rat = not beetle_tracker._show_rat
         # otherwise, update bounding boxes from tracker
         else:
             ok, beetle_tracker._bboxes = beetle_tracker.tracker.update(beetle_tracker.frame)
@@ -144,11 +148,13 @@ def main(track_alg):
             beetle_tracker.frame = beetle_tracker.orig_col.copy()
             # draw current frame
             beetle_tracker._draw_bbox()
+            # append trace and img
+            beetle_tracker._append_record()
             # save image inside the bounding boxes
             beetle_tracker._write_bboxes()
             if args['save_pos'] and len(beetle_tracker.object_name) > 0:
                 beetle_tracker._save_pos()
-            beetle_tracker._append_record()
+            
             # write current frame to output video
             # if WRITE:
             # out.write(beetle_tracker.frame)

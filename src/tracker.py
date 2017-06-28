@@ -18,7 +18,7 @@ import _tkinter
 from src.common import * # comman function 
 from src.keyhandler import KeyHandler
 from src.interface import Interface
-from src.detector import MotionDetector, OnlineUpdateDetector, BeetleDetector
+from src.detector import MotionDetector, OnlineUpdateDetector, BeetleDetector, RatDetector
 
 from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
@@ -59,7 +59,7 @@ params = {'objective': 'binary:logistic', 'verbose': False,
           'gamma': 1, 'subsample': 0.5, 'colsample_bytree': 0.5}
 PREFIX = 'training'
 
-class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, MotionDetector):
+class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, MotionDetector, RatDetector):
     
     def __init__(self, video_path, fps = None, fourcc = None, window_name = None, track_alg = None, object_name = None):
         
@@ -106,7 +106,7 @@ class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, Motio
         self._roi_pts = []
         self._mv_pt = None
         
-        # initial bounding box
+        # initiate bounding box
         self._bboxes = []
         self._roi = []
         self._init_bbox = []
@@ -143,3 +143,8 @@ class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, Motio
         self._n_angle = N_ANGLE
         self._ratio = RATIO
         self._itv_f = INTERVAL_FRAME
+
+        # initiate rat contour
+        self._show_rat = False
+        self.on_rat = []
+        self.rat_cnt = []

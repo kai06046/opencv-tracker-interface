@@ -2,6 +2,7 @@ import cv2, time
 from src.common import *
 import tkinter as tk
 from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
+
 # keyboard return value while it was pressed
 KEY_CONTINUE = ord(' ')
 KEY_ESC = 27
@@ -15,6 +16,7 @@ KEY_LEFT = 2424832 # might different for different machine
 KEY_RIGHT = 2555904
 KEY_JUMP = ord('j')
 KEY_HELP = ord('h')
+KEY_RAT = ord('z')
 
 BAR_HEIGHT = 130
 TXT_COLOR = (0, 255, 255)
@@ -88,7 +90,7 @@ class BasicOperation(object):
             file_len = 0
 
         with open(txt_name, 'a') as f:
-            line = '[%s, %s, %s, %s]\n' % (self.count, len(self._bboxes), [list(b) for b in self._bboxes], self.object_name)
+            line = '[%s, %s, %s, %s, %s]\n' % (self.count, len(self._bboxes), [list(b) for b in self._bboxes], self.object_name, self.on_rat)
 
             if self.count == (file_len + 1):
                 f.write(line)
@@ -113,6 +115,9 @@ class BasicOperation(object):
                 line = '%s\n' % self.count
                 f.write(line)
 
+        # reinitialize on rat list
+        self.on_rat = []
+
     # initialize multi tracker
     def _initialize_tracker(self):
         self.tracker = cv2.MultiTracker(self.track_alg)
@@ -124,6 +129,9 @@ class BasicOperation(object):
             x, y, w, h = b
             x, y, w, h = int(x), int(y), int(w), int(h)
             img = self.orig_gray[y:(y+h), x:(x+w)].copy()
+            on_rat = self.detect_on_rat(b)
+            self.on_rat.append(on_rat)
+
             if self.object_name[i] in self._record.keys():
                 self._record[self.object_name[i]]['image'].append(img)
                 self._record[self.object_name[i]]['trace'].append((x, y))
@@ -378,6 +386,11 @@ class KeyHandler(BasicOperation):
                     self._run_motion = not self._run_motion
                 elif key_add == KEY_HELP:
                     self.help()
+                # friendly switch on off for detector
+                elif key_add in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                    self.switch(key_add)
+                elif key_add == KEY_RAT:
+                    self._show_rat = not self._show_rat
                 else:
                     pass
 
@@ -451,6 +464,11 @@ class KeyHandler(BasicOperation):
                 self._run_motion = not self._run_motion
             elif key_reset == KEY_HELP:
                 self.help()                
+            # friendly switch on off for detector
+            elif key_reset in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                self.switch(key_reset)
+            elif key_reset == KEY_RAT:
+                self._show_rat = not self._show_rat
             # else just keep looping at current frame
             else:
                 video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
@@ -525,6 +543,11 @@ class KeyHandler(BasicOperation):
                 else:
                     cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
                     cv2.setMouseCallback(self.window_name, self._mouse_ops)
+            # friendly switch on off for detector
+            elif key_delete in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                self.switch(key_delete)
+            elif key_delete == KEY_RAT:
+                self._show_rat = not self._show_rat
             else:
                 self.frame = self.orig_col.copy()
 
@@ -591,6 +614,11 @@ class KeyHandler(BasicOperation):
                 else:
                     cv2.namedWindow(self.window_name, cv2.WINDOW_KEEPRATIO)
                     cv2.setMouseCallback(self.window_name, self._mouse_ops)
+            # friendly switch on off for detector
+            elif key_pause in [ord('1'), ord('2'), ord('3'), ord('4')]:
+                self.switch(key_pause)
+            elif key_pause == KEY_RAT:
+                self._show_rat = not self._show_rat
             else:
                 self.frame = self.orig_col.copy()
 
@@ -633,8 +661,13 @@ class KeyHandler(BasicOperation):
                 # change status color
                 cv2.putText(self.frame, 'TRACKING', (5, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
             for i, b in enumerate(self._roi):
+                try:
+                    str_on_rat = 'O' if self.detect_on_rat(self._bboxes[i]) else 'X'
+                except Exception as e:
+                    print(e)
+                    str_on_rat = ''
                 cv2.rectangle(self.frame, b[0], b[1], self.color[i], 2)
-                cv2.putText(self.frame, '%s' % (self.object_name[i]), (b[0][0], b[0][1] - 10), self.font, FONT_SIZE_NM, self.color[i], 1)
+                cv2.putText(self.frame, '%s (%s)' % (self.object_name[i], str_on_rat), (b[0][0], b[0][1] - 10), self.font, FONT_SIZE_NM, self.color[i], 1)
         else:
             if self._delete_box:
                 cv2.putText(self.frame, 'Delete bounding box', (self._mv_pt[0], self._mv_pt[1] + 5), self.font, FONT_SIZE_NM, self.color[self._n], 1)
@@ -658,9 +691,13 @@ class KeyHandler(BasicOperation):
                 else:
                     thickness = 2
                     font_thick = 1
+                try:
+                    str_on_rat = 'O' if self.detect_on_rat(self._bboxes[i]) else 'X'
+                except:
+                    str_on_rat = ''
                 cv2.rectangle(self.frame, b[0], b[1], self.color[i], thickness)
                 cv2.putText(self.frame, 'Current retarget object: %s' % np.array(self.object_name)[int(self._n)], (5, 15), self.font, FONT_SIZE_NM, TXT_COLOR, 1)
-                cv2.putText(self.frame, '%s' % (self.object_name[i]), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], font_thick)
+                cv2.putText(self.frame, '%s (%s)' % (self.object_name[i], str_on_rat), (b[0][0], b[0][1] - 10), self.font, 0.45, self.color[i], font_thick)
 
         # draw the switch of detector for each object
         if len(self.object_name) > 0:
@@ -672,17 +709,19 @@ class KeyHandler(BasicOperation):
                 x, y, w, h = 5 + i * 125, int(self.resolution[1]) + 33, 100, 20
                 rect = np.array( [[[x, y],[x+w,y],[x+w,y+h],[x,y+h]]], dtype=np.int32 )
                 cv2.fillPoly(self.frame, rect, c)
-                cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[i], 3)
-                
-                # cv2.putText(self.frame, name, (5 + i * 30, int(self.resolution[1]) + 50), self.font, FONT_SIZE_EMH * 1.2, c, 1)
+                cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[i], 2)                
         else:
             cv2.putText(self.frame, 'NO OBJECT', (5, int(self.resolution[1] + 50)), self.font, FONT_SIZE_EMH, WHITE, 1)
 
         # draw basic information
         cv2.putText(self.frame,'# %s/%s' % (int(self.count), int(self._frame_count)), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame,'# object %s' % self._len_bbox, (5, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
-        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view the setting'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
+        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view Settings'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
 
+        # draw rat contour
+        if len(self.rat_cnt) > 0 and self._show_rat:
+            cv2.drawContours(self.frame, self.rat_cnt, -1, (216, 233, 62), 2)
+            
         # draw current labeling box
         if len(self._roi_pts) != 0:
 
