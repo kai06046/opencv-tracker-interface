@@ -16,6 +16,7 @@ KEY_LEFT = 2424832 # might different for different machine
 KEY_RIGHT = 2555904
 KEY_JUMP = ord('j')
 KEY_HELP = ord('h')
+KEY_RAT = ord('z')
 
 BAR_HEIGHT = 130
 TXT_COLOR = (0, 255, 255)
@@ -388,6 +389,8 @@ class KeyHandler(BasicOperation):
                 # friendly switch on off for detector
                 elif key_add in [ord('1'), ord('2'), ord('3'), ord('4')]:
                     self.switch(key_add)
+                elif key_add == KEY_RAT:
+                    self._show_rat = not self._show_rat
                 else:
                     pass
 
@@ -464,6 +467,8 @@ class KeyHandler(BasicOperation):
             # friendly switch on off for detector
             elif key_reset in [ord('1'), ord('2'), ord('3'), ord('4')]:
                 self.switch(key_reset)
+            elif key_reset == KEY_RAT:
+                self._show_rat = not self._show_rat
             # else just keep looping at current frame
             else:
                 video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
@@ -541,6 +546,8 @@ class KeyHandler(BasicOperation):
             # friendly switch on off for detector
             elif key_delete in [ord('1'), ord('2'), ord('3'), ord('4')]:
                 self.switch(key_delete)
+            elif key_delete == KEY_RAT:
+                self._show_rat = not self._show_rat
             else:
                 self.frame = self.orig_col.copy()
 
@@ -610,6 +617,8 @@ class KeyHandler(BasicOperation):
             # friendly switch on off for detector
             elif key_pause in [ord('1'), ord('2'), ord('3'), ord('4')]:
                 self.switch(key_pause)
+            elif key_pause == KEY_RAT:
+                self._show_rat = not self._show_rat
             else:
                 self.frame = self.orig_col.copy()
 
