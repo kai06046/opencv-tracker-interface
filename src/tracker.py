@@ -145,5 +145,6 @@ class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, Motio
         self._itv_f = INTERVAL_FRAME
 
         # initiate rat contour
-        self._show_rat = True
+        self._show_rat = False
+        self.on_rat = []
         self.rat_cnt = []
