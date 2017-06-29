@@ -197,10 +197,10 @@ class BeetleDetector(object):
                         
                         if (w / float(h)) > 2.5:
                             print('manual change')
-                            h = h * 1.5
+                            h = int(h * 1.5)
                         elif (h / float(w)) > 2.5:
                             print('manual change')
-                            w = w * 1.5                        
+                            w = int(w * 1.5)
 
                         random_candidates = random_target_a((x, y, w, h), size=(n_candidates, 1)).astype('int')
                         gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
@@ -240,7 +240,7 @@ class BeetleDetector(object):
                                     x, y, w, h = rects[0]
                             else:
                                 x, y, w, h = random_candidates[thres][0]
-                            
+
                             continue_prop = 1- pred_random[thres].mean()
                         else:
                             print('no candidates has beetle...')
@@ -258,7 +258,7 @@ class BeetleDetector(object):
                 if not is_retarget:
                     # reset bounding box with highest probability
                     if n_try != N_MAX:
-                        self._bboxes[bbox_ind] = [x, y, w, h]
+                        self._bboxes[bbox_ind] = [int(x), int(y), int(w), int(h)]
                         print('Done auto retargeting %s...' % (self.object_name[bbox_ind]))
                     # delete bounding box if the number of randomly retargeting exceeds 5000 times
                     else:
