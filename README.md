@@ -26,5 +26,5 @@ After adding model in the tracker, if model detects there is no object in the an
 In our case, we use and transfer ResNet50 as our predictive model.
 
 ## TO-DO
-The precision and recall of our autoupdate tracker is about 98% but the speed is around 1ps, I am trying the another state-of-art object detector [YOLO](https://github.com/philipperemy/yolo-9000) and modified it to suit our case for faster performance.
+The precision and recall of our autoupdate tracker is about 98% but the speed is around 1ps, I am trying to implement another state-of-art object detector [YOLO](https://github.com/philipperemy/yolo-9000) and modify it to suit our case for faster performance.
 
