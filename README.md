@@ -6,7 +6,7 @@ This is a multiple object tracker with human label interface created by OpenCV a
 
 * OS: Windows 7
 * Python 3.5.2 
-* Keras 2.0.4
+* [Keras 2.0.4](https://github.com/fchollet/keras)
 * [OpenCV 3.1.0](https://anaconda.org/menpo/opencv3)
 
 ## Usage description
@@ -23,7 +23,7 @@ OpenCV build-in tracker has been already performing very well. However, since vi
 
 After adding model in the tracker, if model detects there is no object in the any bounding boxes then the tracker will random a number of some candidates. If model predicts that there is beetle inside the candidate bounding box,  tracking process continue with the candidate bounding box. Otherwise, tracking will stop and let's user to decide the next move.
 
-In our case, we use and transfer ResNet50 as our predictive model.
+In our case, we use and transfer [ResNet50](https://github.com/fchollet/deep-learning-models) as our predictive model.
 
 ## TO-DO
 The precision and recall of our autoupdate tracker is about 98% but the speed is around 1ps, I am trying to implement another state-of-art object detector [YOLO](https://github.com/philipperemy/yolo-9000) and modify it to suit our case for faster performance.
