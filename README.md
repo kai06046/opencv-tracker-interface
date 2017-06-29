@@ -18,8 +18,7 @@ OpenCV build-in tracker has been already performing very well. However, since vi
 
 1. Generate images that contain desired object by the tracker without auto stop model
 2. Randomly generate  a bunch of image without object. 
-3. Extract image descriptors like histogram, Haralick and Zernike Momemnts, etc
-4. Train model (like neural network or xgboost) by labeling image without object as 1 and image contains object as 0
+3. Train the network by labeling image without object as 1 and image contains object as 0
 
 After adding model in the tracker, if model detects there is no object in the any bounding boxes then the tracker will random a number of some candidates. If model predicts that there is beetle inside the candidate bounding box,  tracking process continue with the candidate bounding box. Otherwise, tracking will stop and let's user to decide the next move.
 
