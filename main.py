@@ -16,13 +16,10 @@ from keras.models import load_model
 
 from src.common import *
 
-args = {'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False, 
-        'run_model': True, 'save_pos': False, 'is_dl': True}
-FLAG = args['flag_shape'] # if 1, use template size as feature
+args = {'frame_ind': 1, 'run_model': True, 'save_pos': False}
 RESIZE = (224, 224)
 TRACK_ALGORITHM = 'BOOSTING' # Other alternatives are BOOSTING, KCF, TLD, MEDIANFLOW 
 N_MAX = 20 # max number of trying to relocate the target object
-TEMP = True
 
 # keyboard return value while it was pressed
 KEY_CONTINUE = ord(' ')
@@ -46,14 +43,10 @@ def main(track_alg):
     path = get_path()
     beetle_tracker = Tracker(video_path=path, track_alg=track_alg)
     # read video
-    # video = skvideo.io.VideoCapture(find_data_file(beetle_tracker._video))
     video = cv2.VideoCapture(find_data_file(beetle_tracker._video))
-    
-    # if WRITE:
-    # out = cv2.VideoWriter("tracked_%s" % beetle_tracker.file_name, beetle_tracker.fourcc, beetle_tracker.fps, (beetle_tracker.resolution[0], beetle_tracker.resolution[1] + 80))
+    out = cv2.VideoWriter("tracked_%s" % beetle_tracker.file_name, beetle_tracker.fourcc, beetle_tracker.fps, (beetle_tracker.resolution[0], beetle_tracker.resolution[1] + 80))
     # exit if video not opend
     if not video.isOpened():
-
         beetle_tracker.alert('Could not open video: %s \n %s' % (beetle_tracker._video, find_data_file(beetle_tracker._video)))
         sys.exit()
     # store the length of frame and read the first frame
@@ -61,7 +54,6 @@ def main(track_alg):
     ok, frame = video.read()
     
     # setup up the window and mouse callback
-    # cv2.namedWindow(beetle_tracker.window_name)
     cv2.namedWindow(beetle_tracker.window_name, cv2.WINDOW_AUTOSIZE)
     cv2.setMouseCallback(beetle_tracker.window_name, beetle_tracker._mouse_ops)
     while True:
@@ -84,18 +76,18 @@ def main(track_alg):
         if beetle_tracker._add_box:
             time.sleep(0.2)
             beetle_tracker._add_bboxes()
-        if beetle_tracker.count == 2:
+        if beetle_tracker.count > 1:
             beetle_tracker._start = time.clock()
         
         # run stop model 
         if len(beetle_tracker._bboxes) > 0 and beetle_tracker._run_model:
-            if args['is_online_update']:
-                beetle_tracker._is_stop, beetle_tracker._stop_obj = beetle_tracker._detector(FLAG, RESIZE, args['is_dl'], args['is_online_update'])
-            else:
-                beetle_tracker._is_stop, beetle_tracker._stop_obj = beetle_tracker.detect_and_auto_update(FLAG, RESIZE, args['is_dl'], args['is_online_update'], TEMP, N_MAX)
+            beetle_tracker._is_stop, beetle_tracker._stop_obj = beetle_tracker.detect_and_auto_update(RESIZE, N_MAX)
 
         if beetle_tracker._run_motion:
-            beetle_tracker._motion_detector(FLAG, RESIZE, args['is_dl'], args['is_online_update'], TEMP, N_MAX)
+            beetle_tracker._motion_detector(RESIZE, N_MAX)
+            beetle_tracker._draw_bbox()
+            cv2.imshow(beetle_tracker.window_name, beetle_tracker.frame)
+            beetle_tracker._ask_add_box()
 
         # if 'r' was pressed or stop model return True, enter to retarget mode
         if key == KEY_RETARGET or beetle_tracker._is_stop:
@@ -156,22 +148,17 @@ def main(track_alg):
                 beetle_tracker._save_pos()
             
             # write current frame to output video
-            # if WRITE:
-            # out.write(beetle_tracker.frame)
+            out.write(beetle_tracker.frame)
             beetle_tracker.count += 1
             beetle_tracker._n_pass_frame += 1
         else:
             break
         # Display result
         cv2.imshow(beetle_tracker.window_name, beetle_tracker.frame)
-        beetle_tracker._ask_add_box()
-        
+
     video.release()
-    # if WRITE:
-    # out.release()
+    out.release()
     cv2.destroyAllWindows()
-    # if not args['is_dl']:
-    #     pickle.dump(beetle_tracker._model, open('model/%s.dat' % args['model_name'], 'wb'))
 
 if __name__ == '__main__':
 	main(track_alg=TRACK_ALGORITHM)

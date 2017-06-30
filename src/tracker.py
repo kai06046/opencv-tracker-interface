@@ -18,34 +18,21 @@ import _tkinter
 from src.common import * # comman function 
 from src.keyhandler import KeyHandler
 from src.interface import Interface
-from src.detector import MotionDetector, OnlineUpdateDetector, BeetleDetector, RatDetector
+from src.detector import MotionDetector, BeetleDetector, RatDetector
 
 from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
 
-# for stop-tracking-model
-from mahotas.features import haralick, zernike
-from skimage.feature import hog
-import pickle
-import xgboost as xgb
-
-# for online update model
-from sklearn.metrics import recall_score, accuracy_score
-from sklearn.model_selection import train_test_split
-from skimage.measure import compare_ssim
-
 # for deep learning model
 from keras.models import load_model
 
-args = {'model_name': 'nadam_resnet_first_3_freeze_3', 'flag_shape': 0, 'frame_ind': 1, 'is_online_update': False, 
-        'run_model': True, 'save_pos': False, 'is_dl': True}
+args = {'model_name': 'nadam_resnet_first_3_freeze_3', 'frame_ind': 1, 'run_model': True, 'save_pos': False}
 
 # basic variables
 WINDOW_NAME = 'Burying Beetle Tracker'
 FPS, FOURCC = 30, cv2.VideoWriter_fourcc(*'XVID')
 FONT = cv2.FONT_HERSHEY_TRIPLEX
 COLOR = [(0, 255, 0), (255, 100, 10), (20, 50, 255), (0, 255, 255), (255, 255, 0), (255, 0, 255), (255, 255, 255), (0, 0, 0)]
-FLAG = args['flag_shape'] # if 1, use template size as feature
 WRITE = True # if True, write output video
 
 # variables for online update xgboost model
@@ -53,13 +40,9 @@ RATIO = [0, 0.5, 1, 1.5]
 N_ANGLE = 36
 INTERVAL_FRAME = 10
 
-# parameters for xgboost incremental training
-params = {'objective': 'binary:logistic', 'verbose': False, 
-          'eval_metric': ['logloss'], 'max_depth': 7, 'eta': 0.025,
-          'gamma': 1, 'subsample': 0.5, 'colsample_bytree': 0.5}
 PREFIX = 'training'
 
-class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, MotionDetector, RatDetector):
+class Tracker(KeyHandler, Interface, BeetleDetector, MotionDetector, RatDetector):
     
     def __init__(self, video_path, fps = None, fourcc = None, window_name = None, track_alg = None, object_name = None):
         
@@ -121,14 +104,7 @@ class Tracker(KeyHandler, Interface, BeetleDetector, OnlineUpdateDetector, Motio
         self._run_model = args['run_model']
         self._update = False
         # load model data or weight
-        if args['is_dl']:
-            self._model = load_model('model/%s.h5' % args['model_name'])
-            # self._model.summary()
-        else:
-            if os.path.exists('model'):
-                self._model = pickle.load(open(find_data_file('model/%s.dat' % args['model_name']), 'rb'))
-            else:
-                pass
+        self._model = load_model('model/%s.h5' % args['model_name'])
         
         self._stop_obj = None
         self._is_stop = None

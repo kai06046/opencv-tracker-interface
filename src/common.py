@@ -1,7 +1,6 @@
 import numpy as np
 import os, sys
 import cv2
-from skimage.feature import local_binary_pattern
 import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import askokcancel
@@ -10,40 +9,22 @@ from tkinter.messagebox import askokcancel
 convert = lambda x, y, w, h: [(int(x), int(y)), (int(x + w), int(y + h))]
 
 # add randomness to an integer
-def vary_2(x, var, flag, size):
+def vary(x, var, flag, size):
     if not flag:
         return x + np.random.randint(-var, var, size)
     else:
         return x + abs(np.random.randint(-var, var, size))
 # random a new bounding box with a bounding box as input    
-def random_target_a(bbox, var = 35, r = 0.3, flag=False, size=(10, 1)):
+def random_target(bbox, var = 35, r = 0.3, flag=False, size=(10, 1)):
     x, y, w, h = bbox
     # x1, y1 = vary(x, var, flag), vary(y, var, flag)
-    x1, y1, w1, h1 = vary_2(x, var, flag, size), vary_2(y, var, flag, size), vary_2(w, int(var*r), flag, size), vary_2(h, int(var*r), flag, size)
+    x1, y1, w1, h1 = vary(x, var, flag, size), vary(y, var, flag, size), vary(w, int(var*r), flag, size), vary(h, int(var*r), flag, size)
     
     random_candidate = np.hstack((x1, y1, w1, h1))
     random_candidate[random_candidate < 0] = 1
     
     return random_candidate
 
-# # add randomness to an integer
-vary = lambda x, var, flag: x + abs(np.random.randint(-var, var)) if flag else x + np.random.randint(-var, var)
-# random a new bounding box with a bounding box as input
-def random_target(bbox, var = 32, r = 0.28, flag=False):
-    x, y, w, h = bbox
-    # x1, y1 = vary(x, var, flag), vary(y, var, flag)
-    x1, y1, w1, h1 = vary(x, var, flag), vary(y, var, flag), vary(w, int(var*r), flag), vary(h, int(var*r), flag)
-    
-    return int(max(0, x1)), int(max(0, y1)), int(max(1, w1)), int(max(1, h1))
-    # return int(max(0, x1)), int(max(0, y1)), w, h
-
-def random_target2(bbox, var = 30, r = 0.3, flag=False):
-    x, y, w, h = bbox
-    x1, y1 = vary(x, var, flag), vary(y, var, flag)
-    # x1, y1, w1, h1 = vary(x, var, flag), vary(y, var, flag), vary(w, int(var*r), flag), vary(h, int(var*r), flag)
-    
-    # return int(max(0, x1)), int(max(0, y1)), int(max(1, w1)), int(max(1, h1))
-    return int(max(0, x1)), int(max(0, y1)), w, h
 # get specific line from a text file
 def getlines(txt, n_line):
     with open(txt, 'r') as f:
@@ -51,7 +32,7 @@ def getlines(txt, n_line):
     try: 
         line = lines[n_line]
     except:
-        line = '[%s, 0, []]' % int(n_line + 1)
+        line = '[%s, 0, [], [], []]' % int(n_line + 1)
     return line
 # see if a points is inside a rectangle
 def in_rect(pt, rect):  
@@ -118,32 +99,6 @@ def resource_path(relative_path):
         base_path = os.path.abspath(".")
 
     return os.path.join(base_path, relative_path)
-
-# local binary pattern histogram feature
-class LocalBinaryPatterns:
-
-    def __init__(self, numPoints, radius):
-        # store the number of points and radius
-        self.numPoints = numPoints
-        self.radius = radius
- 
-    def describe(self, image, eps=1e-7):
-        # compute the Local Binary Pattern representation
-        # of the image, and then use the LBP representation
-        # to build the histogram of patterns
-        lbp = local_binary_pattern(image, self.numPoints,
-            self.radius, method="uniform")
-        (hist, _) = np.histogram(lbp.ravel(),
-            bins=np.arange(0, self.numPoints + 3),
-            range=(0, self.numPoints + 2))
- 
-        # normalize the histogram
-        hist = hist.astype("float")
-        hist /= (hist.sum() + eps)
- 
-        # return the histogram of Local Binary Patterns
-        return hist
-lbs = LocalBinaryPatterns(12, 4)
 
 # center a tkinter widget
 def center(toplevel):
@@ -234,23 +189,3 @@ def random_rotate(img, angle_vari, p_crop):
     angle = np.random.uniform(-angle_vari, angle_vari)
     crop = False if np.random.random() > p_crop else True
     return rotate_image(img, angle, crop)
-
-# for measurement of image difference
-from scipy.linalg import norm
-from scipy import sum, average
-
-def normalize(arr):
-    rng = arr.max()-arr.min()
-    amin = arr.min()
-    return (arr-amin)*255/rng
-
-def compare_images(img1, img2):
-    # normalize to compensate for exposure difference, this may be unnecessary
-    # consider disabling it
-    img1 = normalize(cv2.resize(img1, (80, 80)).copy())
-    img2 = normalize(cv2.resize(img2, (80, 80)).copy())
-    # calculate the difference and its norms
-    diff = img1 - img2  # elementwise for scipy arrays
-    m_norm = np.mean(abs(diff))  # Manhattan norm
-    # z_norm = norm(diff.ravel(), 0)  # Zero norm
-    return m_norm
