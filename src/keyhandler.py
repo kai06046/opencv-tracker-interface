@@ -178,11 +178,7 @@ class KeyHandler(BasicOperation):
                 self._roi_pts[0], self._roi_pts[1] = (min(x0, x1), min(y0, y1)), (max(x0, x1), max(y0, y1))
                 roi_pts = self._roi_pts
 
-                # update model (closed this method currently)
-                # self._update_model(type='stop')
-                self._bboxes[self._n] = (roi_pts[0][0], roi_pts[0][1],  
-                                       roi_pts[1][0] - roi_pts[0][0], roi_pts[1][1] - roi_pts[0][1])
-                # self._update_model(type='continue')
+                self._bboxes[self._n] = (roi_pts[0][0], roi_pts[0][1], roi_pts[1][0] - roi_pts[0][0], roi_pts[1][1] - roi_pts[0][1])
                 self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
                 if self.object_name[self._n] in self._record.keys(): self._record[self.object_name[self._n]]['trace'] = []
             else:

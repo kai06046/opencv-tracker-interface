@@ -1,9 +1,4 @@
 from src.common import *
-import xgboost as xgb
-
-from mahotas.features import haralick, zernike
-from mahotas.thresholding import otsu
-from skimage.feature import hog
 import cv2
 import warnings
 import time
@@ -14,11 +9,6 @@ from collections import namedtuple
 # for multithread
 from multiprocessing.dummy import Pool as ThreadPool
 
-# parameters for incremental training
-params = {'objective': 'binary:logistic', 'verbose': False, 
-          'eval_metric': ['logloss'], 'max_depth': 3, 'eta': 0.025,
-          'gamma': 0.5, 'subsample': 0.5, 'colsample_bytree': 0.5}
-
 Rectangle = namedtuple('Rectangle', 'p1 p2')
 KEY_ESC = 27
 
@@ -27,40 +17,13 @@ pool = ThreadPool(4)
 class BeetleDetector(object):
     # extract features for stop model
     @staticmethod
-    def extract_features(img, flag, inputShape, is_dl, is_olupdate):
-        if is_dl:
-            # img_to_array(load_img)
-            img = cv2.resize(img, inputShape, interpolation = cv2.INTER_NEAREST)
-            # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            img = img / 255.0
-            # preprocess(image)
-            # print('preprocess image took %s secs' % (round(time.clock() - start, 2)))
-            return img
-        else:
-            orig = img.shape
-            if not is_olupdate:
-                img = cv2.resize(img, inputShape)
-            warnings.filterwarnings('ignore')
-            f_hog = hog(cv2.resize(img, (64, 64)), orientations=8, pixels_per_cell=(24, 24), cells_per_block=(1, 1))
-            f_lbs = lbs.describe(img)
-            
-            # normalized intensity histogram
-            hist = cv2.calcHist([img], [0], None, [32], (0, 256))
-            n_hist = cv2.normalize(hist, hist, 0, 1, cv2.NORM_MINMAX).flatten()
-            # HuMoments
-            HuMoments = cv2.HuMoments(cv2.moments(img)).flatten()
-            # Zernike moments
-            Zernike = zernike(img, radius=1, degree=8)
-            # Haralick
-            Haralick = haralick(img).mean(axis=0)
-
-            if flag == 1:
-                return np.array(list(n_hist) + list(HuMoments) + list(Zernike) + list(Haralick) + list(np.array(orig)))
-            elif flag == 0:
-                return np.array(list(n_hist) + list(HuMoments) + list(Zernike) + list(Haralick) + list(f_hog) + list(f_lbs))    
+    def extract_features(img, inputShape):        
+        img = cv2.resize(img, inputShape, interpolation = cv2.INTER_NEAREST)
+        img = img / 255.0
+        return img
     
     # stop model and auto update with random ROI which has highest probability contain beetle
-    def detect_and_auto_update(self, flag, inputShape, is_dl, is_olupdate, TEMP, N_MAX):
+    def detect_and_auto_update(self, inputShape, N_MAX):
 
         X = []
         stop_obj = []
@@ -68,30 +31,16 @@ class BeetleDetector(object):
         for i, b in enumerate(self._bboxes):
             x, y, w, h = b
             x, y, w, h = int(x), int(y), int(w), int(h)
-            if is_dl:
-                img = self.orig_col[y:(y+h), x:(x+w)]
-            else:    
-                img = self.orig_gray[y:(y+h), x:(x+w)]
-            X.append(self.extract_features(img, flag, inputShape, is_dl, is_olupdate))
+            img = self.orig_col[y:(y+h), x:(x+w)]
+            X.append(self.extract_features(img, inputShape))
         
-        if is_dl:
-            X = np.array(X)
-            pred = self._model.predict(X)
-            print('Probability of bounding box has no beetle in frame %s' % self.count)
-            for i, p in enumerate(pred):
-                print('%s: %s' % (self.object_name[i], round(pred[i][0], 3)))
+        X = np.array(X)
+        pred = self._model.predict(X)
+        print('Probability of bounding box has no beetle in frame %s' % self.count)
+        for i, p in enumerate(pred):
+            print('%s: %s' % (self.object_name[i], round(pred[i][0], 3)))
 
-            prediction = np.array([1 if v[0] > 0.4 else 0 for v in pred]) # i.e. continue only if the probability of bounding box has beetle < 0.4
-        else:
-            X = np.array(X)
-            if not TEMP: 
-                pred = self._model.predict_proba(X)
-                pred = np.array([1 if v[1] > 0.4 else 0 for v in pred]) 
-            else:
-                pred = self._model.predict(xgb.DMatrix(X)) # probability of there is no beetle in bounding box
-                print('Probability of bouding box has no beetle: %s' % pred)
-                pred = np.array([1 if v > 0.5 else 0 for v in pred]) # i.e. continue only if the probability of beetle being in bounding box > 0.6
-                
+        prediction = np.array([1 if v[0] > 0.4 else 0 for v in pred]) # i.e. continue only if the probability of bounding box has beetle < 0.4                
         
         is_overlapped = np.array([overlapped(self._roi[i], self._roi[0:i] + self._roi[i+1:]) for i in range(len(self._roi))])
         
@@ -169,28 +118,12 @@ class BeetleDetector(object):
                                 print('break from the auto retargeting by trace')
                                 is_retarget = False
                                 break
-                                # return False, None
 
-                            if is_dl:
-                                random_roi_feature = [self.extract_features(self.orig_col[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
-                                random_roi_feature = np.array(random_roi_feature)
-                                pred_random = self._model.predict(random_roi_feature)[0][0]
-                                # if pred_random < orig_prob:
-                                    # print('original prob: %s pred_random: %s' % (orig_prob, pred_random))
-                                    # orig_prob = pred_random
-                                    # self._bboxes[bbox_ind] = (x, y, w, h)
-                                    # print('update bbox but still continue update')
+                            random_roi_feature = [self.extract_features(self.orig_col[y:(y+h), x:(x+w)], inputShape)]
+                            random_roi_feature = np.array(random_roi_feature)
+                            pred_random = self._model.predict(random_roi_feature)[0][0]
 
-                                continue_prop = 1- pred_random
-                            else:
-                                random_roi_feature = [self.extract_features(self.orig_gray[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate)]
-                                random_roi_feature = np.array(random_roi_feature)
-                                if not TEMP:
-                                    pred = self._model.predict_proba(random_roi_feature)
-                                    continue_prop = pred[0][0]
-                                else:
-                                    pred = self._model.predict(xgb.DMatrix(random_roi_feature))
-                                    continue_prop = 1 - pred[0]
+                            continue_prop = 1- pred_random
                     else:
                         n_candidates = 30
                         x, y, w, h = self._bboxes[bbox_ind]
@@ -202,11 +135,10 @@ class BeetleDetector(object):
                             print('manual change')
                             w = int(w * 1.5)
 
-                        random_candidates = random_target_a((x, y, w, h), size=(n_candidates, 1)).astype('int')
+                        random_candidates = random_target((x, y, w, h), size=(n_candidates, 1)).astype('int')
                         gp_rects, _ = cv2.groupRectangles(random_candidates.tolist(), min(2, len(random_candidates) - 1), eps=1)
                         gp_rects.astype('int')
                         x, y, w, h = gp_rects[0]
-                        # x, y, w, h = int(x), int(y), int(w), int(h)
                         cv2.rectangle(self.frame, (x, y), (x+w, y+h), self.color[bbox_ind], 2)
                         cv2.putText(self.frame, '# retargeting of %s: %s/%s' % (self.object_name[bbox_ind], n_try, N_MAX), (20, 35), self.font, 1, (0, 255, 255), 2)
                         self._draw_bbox()
@@ -218,7 +150,7 @@ class BeetleDetector(object):
                             is_retarget = False
                             break
 
-                        random_roi_feature = [np.expand_dims(self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], flag, inputShape, is_dl, is_olupdate), 0) for r in random_candidates]
+                        random_roi_feature = [np.expand_dims(self.extract_features(self.orig_col[r[1]:(r[1]+r[3]), r[0]:(r[0]+r[2])], inputShape), 0) for r in random_candidates]
 
                         pred_time = time.clock()
                         print('predicting...')
@@ -280,14 +212,13 @@ class BeetleDetector(object):
 
 class MotionDetector(object):
     # detect motion for potential target
-    def _motion_detector(self, flag, inputShape, is_dl, is_olupdate, TEMP, N_MAX):
+    def _motion_detector(self, inputShape, N_MAX):
 
         fg_mask = self._bs.apply(self.orig_gray.copy())
 
         potential_rect = []
 
         th = cv2.threshold(fg_mask.copy(), 200, 255, cv2.THRESH_BINARY)[1]
-        
         # get contours from dilated frame
         _, contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -296,7 +227,7 @@ class MotionDetector(object):
             x, y, w, h = cv2.boundingRect(c)
             # calculate the area
             area = cv2.contourArea(c)
-            if area > 200 and area < 800 and x < 1200 and (w/h < 2) and (h/w < 2):
+            if area > 180 and area < 800 and x < 1200 and (w/h < 2) and (h/w < 2):
                 if area < 350:
                     x = int(x / 1.03)
                     y = int(y / 1.03)
@@ -312,15 +243,11 @@ class MotionDetector(object):
 
         if len(potential_rect) > 0:
             
-            X_potential = np.array([self.extract_features(self.orig_col.copy()[y:(y+h), x:(x+w)], flag, inputShape, is_dl, is_olupdate) for x, y, w, h in potential_rect])
+            X_potential = np.array([self.extract_features(self.orig_col.copy()[y:(y+h), x:(x+w)], inputShape) for x, y, w, h in potential_rect])
             
-            if is_dl:
-                pred_potential_prob = self._model.predict(X_potential)
-                print('potential has no beetle probability: %s' % pred_potential_prob)
-                pred_potential = np.array([1 if v[0] < 0.35 else 0 for v in pred_potential_prob])
-            else:    
-                pred_potential = self._model.predict(xgb.DMatrix(X_potential))
-                pred_potential = np.array([1 if v < 0.5 else 0 for v in pred_potential])
+            pred_potential_prob = self._model.predict(X_potential)
+            print('potential has no beetle probability: %s' % pred_potential_prob)
+            pred_potential = np.array([1 if v[0] < 0.35 else 0 for v in pred_potential_prob])
 
             if any(pred_potential == 1):
                 self._pot_rect = np.array(potential_rect)[np.where(pred_potential == 1)]
@@ -330,184 +257,18 @@ class MotionDetector(object):
         else:
             self._pot_rect =  []
 
-class OnlineUpdateDetector(object):
-    # generate postive image inside bounding box and update in record
-    def _generate_positive(self, b, i, flag, inputShape, is_dl, is_olupdate):
-
-        x, y, w, h = b
-        img = self.orig_gray[y:(y+h), x:(x+w)].copy()
-
-        if self.object_name[i] in self._record.keys():
-            self._record[self.object_name[i]]['data']['positive'].append(self.extract_features(img, flag, inputShape, is_dl, is_olupdate))
-            self._record[self.object_name[i]]['image'].append(img)
-            self._record[self.object_name[i]]['num'] += 1
-            self._record[self.object_name[i]]['loc'].append((x, y))
-        else:
-            self._record[self.object_name[i]] = {"data": {'positive': [], 'negative': [], 'rotate': []}, "model": None, "num": 1, "image": [img], "loc":[(x, y)]}
-            self._record[self.object_name[i]]['data']['positive'].append(self.extract_features(img, flag, inputShape, is_dl, is_olupdate))
-    
-    # generate rotate positive data from current positive image and in record
-    def _generate_rotate_pos(self, i, flag, inputShape, is_dl, is_olupdate):
-
-        img = self._record[self.object_name[i]]['image'][-1].copy()
-        n_ind = 1
-        n_max = self._n_angle
-        angle = 360 / n_max
-        while n_ind < n_max:
-            pos = rotate_image(img, angle, True)
-            self._record[self.object_name[i]]['data']['rotate'].append(self.extract_features(pos, flag, inputShape, is_dl, is_olupdate))
-            n_ind += 1
-            angle += 360/n_max
-
-    # generate negative data from surrounding bounding box with same size as positive and update in record
-    def _generate_negative(self, b, i, flag, inputShape, is_dl, is_olupdate):
-
-        x, y, w, h = b
-        ratio = self._ratio
-        neg_samples = [(max(0, int(x + w*rx*xsign)), max(0, int(y + w*ry*ysign)), w, h) for rx in ratio for ry in ratio for xsign in [-1, 1] for ysign in [-1, 1] if rx != 0 or ry != 0]
-        for b_temp in neg_samples:
-            x, y, w, h = b_temp
-            img = self.orig_gray[y:(y+h), x:(x+w)]
-            self._record[self.object_name[i]]['data']['negative'].append(self.extract_features(img, flag, inputShape, is_dl, is_olupdate))
-
-    # train the i th bounding box model
-    def _train(self, i):
-
-        pos = self._record[self.object_name[i]]['data']['positive'] + self._record[self.object_name[i]]['data']['rotate']
-        neg = self._record[self.object_name[i]]['data']['negative']
-        X = np.array(pos + neg)
-        Y = np.array([0] * len(pos) + [1] * len(neg))
-        print('Samples size: %s  Positive: %s  Negative: %s' % (len(X), Y.sum(), len(X) - Y.sum()))
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.1)
-
-        xg_train = xgb.DMatrix(X_train, label = Y_train)
-        xg_test = xgb.DMatrix(X_test)
-
-        model = xgb.train(params, xg_train, 100)
-        
-        y_pred = model.predict(xg_test)
-        print("Detect model of %s's recall: %s  accuracy: %s" % (self.object_name[i], recall_score(Y_test, [round(v) for v in y_pred]), accuracy_score(Y_test, [round(v) for v in y_pred])))
-
-        self._record[self.object_name[i]]['model'] = model
-
-    # delete data generated from last record
-    def _update_data(self, b, i, flag, inputShape, is_dl, is_olupdate):
-        self._record[self.object_name[i]]['data']['positive'].pop(0)
-        self._record[self.object_name[i]]['image'].pop(0)
-        self._record[self.object_name[i]]['num'] -= 1
-        del self._record[self.object_name[i]]['data']['rotate'][0:self._n_angle]
-        del self._record[self.object_name[i]]['data']['negative'][0:(4*(len(self._ratio)**2) - 1)]
-
-        img = self._generate_positive(b, i, flag, inputShape, is_dl, is_olupdate)
-        self._generate_rotate_pos(i, flag, inputShape, is_dl, is_olupdate)
-        self._generate_negative(b, i, flag, inputShape, is_dl, is_olupdate)
-
-    def _detector(self, flag, inputShape, is_dl, is_olupdate):
-        stop_obj = []
-        # for all bounding box, collect data separately
-        for i, b in enumerate(self._bboxes):
-            if self._record.get(self.object_name[i], {}).get('num', 0) < 4:
-                b = [int(elt) for elt in b]
-                img = self._generate_positive(b, i, flag, inputShape, is_dl, is_olupdate)
-                self._generate_rotate_pos(i, flag, inputShape, is_dl, is_olupdate)
-                self._generate_negative(b, i, flag, inputShape, is_dl, is_olupdate)
-                print('Collecting data for %s' % self.object_name[i])
-                # return False, None
-            else:
-                b = [int(elt) for elt in b]
-                x, y, w, h = b
-                img = self.orig_gray[y:(y+h), x:(x+w)].copy()
-                
-                # ssim = compare_ssim(img, self._record[self.object_name[i]]['image'][-1])
-                cos_sim = round(cosine_similarity(self.extract_features(img, flag, inputShape, is_dl, is_olupdate), 
-                    self.extract_features(self._record[self.object_name[i]]['image'][-1], flag, inputShape, is_dl, is_olupdate))[0][0], 5)
-                print('Similarity with last image of %s: %s' % (self.object_name[i], cos_sim))
-
-                if cos_sim < 0.9999:
-
-                    if not self._record[self.object_name[i]]['model']:
-                        self._train(i)
-
-                    X_current = np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)])
-                    xg_current = xgb.DMatrix(X_current)
-                    y_current = self._record[self.object_name[i]]['model'].predict(xg_current)
-
-                    print('Probability of no beetle in %s: %s' % (self.object_name[i], y_current[0]))
-
-                    # if the probability of no beetle in bounding box bigger than 0.5
-                    if y_current[0] > 0.5:
-                        n_try = 0
-                        pred = np.array([1])
-
-                        # start random retarget, if pred > 0.5, rerandom again
-                        while pred[0] > 0.5:
-                            if n_try == 0:
-                                loc = self._record[self.object_name[i]]['loc']
-                                nx, ny, nw, nh = loc[-1][0] + (loc[-1][0] - loc[-2][0]), loc[-1][1] + (loc[-1][1] - loc[-2][1]), w, h
-                            else:
-                                nx, ny, nw, nh = random_target2(b, 10)
-                            
-                            img = self.orig_gray[ny:(ny+nh), nx:(nx+nw)].copy()
-                            X_current = np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)])
-
-                            pred = self._record[self.object_name[i]]['model'].predict(xgb.DMatrix(X_current))
-                            print('Probability of no beetle in new %s: %s' % (self.object_name[i], pred[0]))
-                            n_try += 1
-                            if n_try > N_MAX:
-                                break
-
-                        if n_try < N_MAX:
-                            new_bbox = (nx, ny, nw, nh)
-                            self._update_data(new_bbox, i)
-                            self._train(i)
-                            self._bboxes[i] = new_bbox # update new bounding box
-                            print('Done retargeting %s...' % self.object_name[i])
-                            
-                            self._initialize_tracker()
-                            self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
-                        else:
-                            # self._ask_retarget_box()
-                            del self._record[self.object_name[i]]
-                            stop_obj.append(i)
-                    
-                # if image inside bounding box is similar
-                else:
-                    # update data every interval frame
-                    if self.count % self._itv_f == 0:
-                        if self._record.get(self.object_name[i], {}).get('num', 0) >= 4:
-                            print('Update data and model of %s since this is frame %s' % (self.object_name[i], self.count))
-                            self._update_data(b, i, flag, inputShape, is_dl, is_olupdate)
-                            self._train(i)
-
-        if len(stop_obj) != 0:
-            return True, stop_obj
-        else:
-            return False, None
-
-    # update model with incremental data
-    def _update_model(self, type='stop'):
-        if self._update:            
-            x, y, w, h = self._bboxes[self._n]
-            img = self.orig_gray[y:(y+h), x:(x+w)]
-            if type == 'stop':
-                xg_train = xgb.DMatrix(np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)]), np.array([1]))
-            else:
-                xg_train = xgb.DMatrix(np.array([self.extract_features(img, flag, inputShape, is_dl, is_olupdate)]), np.array([0]))
-
-            self._model = xgb.train(params, xg_train, 50, xgb_model = self._model)
-            print('Model updated')        
-
 class RatDetector(object):
 
     def detect_rat_contour(self):
 
         blurred = cv2.GaussianBlur(self.orig_gray, (5, 5), 0)
 
-        # otsu
-        T = otsu(blurred)
-        th = self.orig_gray.copy()
-        th[th > T] = 255
-        th[th < 255] = 0
+        # Otsu's thresholding
+        _, th = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        # T = otsu(blurred)
+        # th = self.orig_gray.copy()
+        # th[th > T] = 255
+        # th[th < 255] = 0
         _, cnts, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # find contour with the biggest area
         self.rat_cnt = sorted(cnts, key=cv2.contourArea)[-1]
