@@ -44,7 +44,7 @@ def main(track_alg):
     beetle_tracker = Tracker(video_path=path, track_alg=track_alg)
     # read video
     video = cv2.VideoCapture(find_data_file(beetle_tracker._video))
-    out = cv2.VideoWriter("tracked_%s" % beetle_tracker.file_name, beetle_tracker.fourcc, beetle_tracker.fps, (beetle_tracker.resolution[0], beetle_tracker.resolution[1] + 80))
+    beetle_tracker.out = cv2.VideoWriter("tracked_%s" % beetle_tracker.file_name, beetle_tracker.fourcc, beetle_tracker.fps, (beetle_tracker.resolution[0], beetle_tracker.resolution[1] + 130))
     # exit if video not opend
     if not video.isOpened():
         beetle_tracker.alert('Could not open video: %s \n %s' % (beetle_tracker._video, find_data_file(beetle_tracker._video)))
@@ -76,7 +76,7 @@ def main(track_alg):
         if beetle_tracker._add_box:
             time.sleep(0.2)
             beetle_tracker._add_bboxes()
-        if beetle_tracker.count > 1:
+        if beetle_tracker.count > 1 and beetle_tracker._start is None:
             beetle_tracker._start = time.clock()
         
         # run stop model 
@@ -148,7 +148,7 @@ def main(track_alg):
                 beetle_tracker._save_pos()
             
             # write current frame to output video
-            out.write(beetle_tracker.frame)
+            beetle_tracker.out.write(beetle_tracker.frame)
             beetle_tracker.count += 1
             beetle_tracker._n_pass_frame += 1
         else:
@@ -157,7 +157,7 @@ def main(track_alg):
         cv2.imshow(beetle_tracker.window_name, beetle_tracker.frame)
 
     video.release()
-    out.release()
+    beetle_tracker.out.release()
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
