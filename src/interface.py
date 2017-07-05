@@ -126,7 +126,7 @@ class Interface(object):
     # delete box method
     def _del_method(self):
         # update model if delete a object
-        self._update_model()
+        # self._update_model()
         # delete selected bounding box
         self._bboxes = np.delete(self._bboxes, self._n, axis=0)
         self._len_bbox -= 1
