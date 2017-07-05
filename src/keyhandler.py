@@ -27,7 +27,7 @@ FONT_SIZE_MG = 0.55
 FONT_SIZE_EMH = 0.75
 
 PREFIX = 'training'
-
+save_neg = False
 class BasicOperation(object):
 
     # save img inside the bounding boxes (for training model)
@@ -42,20 +42,18 @@ class BasicOperation(object):
             img  = self.orig_gray[y:(y+h), x:(x+w)]
 
             try:
-                # diff = compare_images(img, self._record[self.object_name[i]][-1])
-                # print('diff between current and the last frame of beetle %s: %s' % (self.object_name[i], diff))
-
-                # if diff > 0.03:
                 cv2.imwrite(('%s/beetle_pos/' % prefix) + img_name, img)
-                neg_samples = [(max(0, int(x + w*rx*xsign)), max(0, int(y + h*ry*ysign)), w, h) for rx in ratio for ry in ratio for xsign in [-1, 1] for ysign in [-1, 1] if rx != 0 or ry != 0]
-                for j, b_temp in enumerate(neg_samples):
-                    try:
-                        x, y, w, h = b_temp
-                        x, y, w, h = int(x), int(y), int(w), int(h)
-                        img_name = "%s_%05d_%02d_%d.png" % (self.video_name, self.count, int(i+1), int(j+1))
-                        cv2.imwrite(('%s/new_neg/' % prefix) + img_name, self.orig_gray[y:(y+h), x:(x+w)]) 
-                    except:
-                        print('pass boundary')
+                
+                if save_neg:
+                    neg_samples = [(max(0, int(x + w*rx*xsign)), max(0, int(y + h*ry*ysign)), w, h) for rx in ratio for ry in ratio for xsign in [-1, 1] for ysign in [-1, 1] if rx != 0 or ry != 0]
+                    for j, b_temp in enumerate(neg_samples):
+                        try:
+                            x, y, w, h = b_temp
+                            x, y, w, h = int(x), int(y), int(w), int(h)
+                            img_name = "%s_%05d_%02d_%d.png" % (self.video_name, self.count, int(i+1), int(j+1))
+                            cv2.imwrite(('%s/new_neg/' % prefix) + img_name, self.orig_gray[y:(y+h), x:(x+w)]) 
+                        except:
+                            print('pass boundary')
             except Exception as e:
                 print(e)
 
@@ -82,6 +80,9 @@ class BasicOperation(object):
 
         self._bboxes = np.array(bboxes)
         self._roi = [convert(a[0], a[1], a[2], a[3]) for a in self._bboxes]
+        for i, b in enumerate(self._bboxes):
+            x, y, w, h = b
+            self._record[self.object_name[i]] = {'image': [], 'trace':[(x, y)], 'detect': True}
         self._len_bbox = n_obj
         self._initialize_tracker()
 
@@ -120,6 +121,34 @@ class BasicOperation(object):
                 line = '%s\n' % self.count
                 f.write(line)
 
+        txt_name3 = 'yolo_format_%s.txt' % self.video_name
+
+        if os.path.isfile(txt_name3):
+            file_len = len(open(txt_name3, 'r').readlines())
+        else:
+            file_len = 0
+
+        with open(txt_name3, 'a') as f:
+            temp = [list(b) for b in self._bboxes]
+            temp = [[0, l[0], l[1], l[0]+l[2], l[1]+l[3]] for l in temp]
+            line = '[%s, %s]\n' % (self.count, temp)
+            if self.count == (file_len + 1):
+                f.write(line)
+            else:
+                with open(txt_name3, 'r') as nf:
+                    data = nf.readlines()
+                    try:
+                        data[self.count - 1] = line
+                    except:
+                        line_temp = ['[%s, []]\n' % c for c in range(file_len + 1, self.count + 1)]
+                        data = data + line_temp
+                        data[self.count - 1] = line
+                with open(txt_name3, 'w') as nf:
+                    nf.writelines(data)
+
+        dir_create('images/%s/' % self.video_name)
+        cv2.imwrite('images/%s/%06d.png' % (self.video_name, self.count), self.orig_col[:720, :])
+
         # reinitialize on rat list
         self.on_rat = []
 
@@ -127,7 +156,11 @@ class BasicOperation(object):
     def _initialize_tracker(self):
         self.tracker = cv2.MultiTracker(self.track_alg)
         if len(self._bboxes) > 0:
-            self.tracker.add(self.frame, tuple(self._bboxes))
+            try:
+                self.tracker.add(self.frame, tuple(self._bboxes))
+            except Exception as e:
+                print(e)
+                print(tuple(self._bboxes))
 
     # append meta data of tracking
     def _append_record(self):
@@ -279,6 +312,7 @@ class KeyHandler(BasicOperation):
         self._record = {}
         self._stop_obj = None
         self._is_stop = False
+        self._pot_rect = []
 
         if self.count != orig_frame_count:
             # read next frame and obtain bounding boxes
@@ -286,6 +320,7 @@ class KeyHandler(BasicOperation):
             _, self.frame = video.read()
             self._init_frame()
             self._read_bboxes()
+            print(self._record)
             if self._len_bbox != 0 or self._add_box:
                 action_func()
             else:
@@ -637,6 +672,7 @@ class KeyHandler(BasicOperation):
         cv2.putText(self.frame, 'RETARGET', (340, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, WHITE, 1)
         cv2.putText(self.frame, 'DELETE', (495, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, WHITE, 1)
         cv2.putText(self.frame, 'AUTOADD', (615, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR if self._run_motion else WHITE, 2 if self._run_motion else 1)
+        cv2.putText(self.frame, 'AUTORETARGET', (765, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR if self._run_model else WHITE, 2 if self._run_model else 1)
 
         # draw potential bounding box that has target object
         if len(self._pot_rect) > 0:
@@ -651,9 +687,9 @@ class KeyHandler(BasicOperation):
                 if self._mv_pt:
                     cv2.putText(self.frame, 'Add bounding box', (self._mv_pt[0], self._mv_pt[1] + 5), self.font, FONT_SIZE_NM, TXT_COLOR, 1)
                 if self._len_bbox > 0:
-                    cv2.putText(self.frame, 'Draw a rectangle to add new target', (120, int(self.resolution[1] + 75)), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                    cv2.putText(self.frame, 'Draw a rectangle to add new target', (150, int(self.resolution[1] + 75)), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
                 else:
-                    cv2.putText(self.frame, 'Draw a rectangle to start tracking', (120, int(self.resolution[1] + 75)), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                    cv2.putText(self.frame, 'Draw a rectangle to start tracking', (150, int(self.resolution[1] + 75)), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
                 # change status color
                 cv2.putText(self.frame, 'ADD', (155, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
             elif self._pause:
@@ -673,12 +709,12 @@ class KeyHandler(BasicOperation):
         else:
             if self._delete_box:
                 cv2.putText(self.frame, 'Delete bounding box', (self._mv_pt[0], self._mv_pt[1] + 5), self.font, FONT_SIZE_NM, self.color[self._n], 1)
-                cv2.putText(self.frame, 'Double click the bounding box to delete', (120, int(self.resolution[1]) + 75), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                cv2.putText(self.frame, 'Double click the bounding box to delete', (150, int(self.resolution[1]) + 75), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
                 # change status color
                 cv2.putText(self.frame, 'DELETE', (495, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
             elif self._retargeting:
                 cv2.putText(self.frame, 'Retarget bounding box', (self._mv_pt[0], self._mv_pt[1] + 5), self.font, FONT_SIZE_NM, self.color[self._n], 1)
-                cv2.putText(self.frame, 'Retarget by drawing a new rectangle', (120, int(self.resolution[1]) + 75), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
+                cv2.putText(self.frame, 'Retarget by drawing a new rectangle', (150, int(self.resolution[1]) + 75), self.font, FONT_SIZE_EMH, MSG_COLOR, 1)
                 # change status color
                 cv2.putText(self.frame, 'RETARGET', (340, int(self.resolution[1]) + 25), self.font, FONT_SIZE_EMH, MSG_COLOR, 2)
                 if self._is_stop:
@@ -718,7 +754,7 @@ class KeyHandler(BasicOperation):
         # draw basic information
         cv2.putText(self.frame,'# %s/%s' % (int(self.count), int(self._frame_count)), (5, int(self.resolution[1]) + 75), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
         cv2.putText(self.frame,'# object %s' % self._len_bbox, (5, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
-        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view Settings'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (120, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
+        cv2.putText(self.frame,'resolution: %s x %s   FPS: %s   Press h to view Settings'% (self.width, self.height, (round(self._n_pass_frame/(time.clock() - self._start), 3) if self._start else 0)), (150, int(self.resolution[1]) + 100), self.font, FONT_SIZE_MG, TXT_COLOR, 1)
 
         # draw rat contour
         if len(self.rat_cnt) > 0 and self._show_rat:
