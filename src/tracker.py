@@ -24,6 +24,7 @@ from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
 
 # for deep learning model
+import tensorflow as tf
 from keras.models import load_model
 
 args = {'model_name': 'nadam_resnet_first_3_freeze_3', 'frame_ind': 1, 'run_model': True, 'save_pos': False}
