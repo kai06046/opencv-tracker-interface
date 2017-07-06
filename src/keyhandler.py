@@ -121,33 +121,33 @@ class BasicOperation(object):
                 line = '%s\n' % self.count
                 f.write(line)
 
-        txt_name3 = 'yolo_format_%s.txt' % self.video_name
+        # txt_name3 = 'yolo_format_%s.txt' % self.video_name
 
-        if os.path.isfile(txt_name3):
-            file_len = len(open(txt_name3, 'r').readlines())
-        else:
-            file_len = 0
+        # if os.path.isfile(txt_name3):
+        #     file_len = len(open(txt_name3, 'r').readlines())
+        # else:
+        #     file_len = 0
 
-        with open(txt_name3, 'a') as f:
-            temp = [list(b) for b in self._bboxes]
-            temp = [[0, l[0], l[1], l[0]+l[2], l[1]+l[3]] for l in temp]
-            line = '[%s, %s]\n' % (self.count, temp)
-            if self.count == (file_len + 1):
-                f.write(line)
-            else:
-                with open(txt_name3, 'r') as nf:
-                    data = nf.readlines()
-                    try:
-                        data[self.count - 1] = line
-                    except:
-                        line_temp = ['[%s, []]\n' % c for c in range(file_len + 1, self.count + 1)]
-                        data = data + line_temp
-                        data[self.count - 1] = line
-                with open(txt_name3, 'w') as nf:
-                    nf.writelines(data)
+        # with open(txt_name3, 'a') as f:
+        #     temp = [list(b) for b in self._bboxes]
+        #     temp = [[0, l[0], l[1], l[0]+l[2], l[1]+l[3]] for l in temp]
+        #     line = '[%s, %s]\n' % (self.count, temp)
+        #     if self.count == (file_len + 1):
+        #         f.write(line)
+        #     else:
+        #         with open(txt_name3, 'r') as nf:
+        #             data = nf.readlines()
+        #             try:
+        #                 data[self.count - 1] = line
+        #             except:
+        #                 line_temp = ['[%s, []]\n' % c for c in range(file_len + 1, self.count + 1)]
+        #                 data = data + line_temp
+        #                 data[self.count - 1] = line
+        #         with open(txt_name3, 'w') as nf:
+        #             nf.writelines(data)
 
-        dir_create('images/%s/' % self.video_name)
-        cv2.imwrite('images/%s/%06d.png' % (self.video_name, self.count), self.orig_col[:720, :])
+        # dir_create('images/%s/' % self.video_name)
+        # cv2.imwrite('images/%s/%06d.png' % (self.video_name, self.count), self.orig_col[:720, :])
 
         # reinitialize on rat list
         self.on_rat = []
@@ -319,6 +319,7 @@ class KeyHandler(BasicOperation):
             video.set(cv2.CAP_PROP_POS_FRAMES, self.count - 1)
             _, self.frame = video.read()
             self._init_frame()
+            self._bs = cv2.createBackgroundSubtractorMOG2()
             self._read_bboxes()
             print(self._record)
             if self._len_bbox != 0 or self._add_box:
@@ -482,6 +483,7 @@ class KeyHandler(BasicOperation):
             elif key_reset == KEY_JUMP:
                 temp_count = self.count
                 self._jump_frame(self._retarget_bboxes)
+                self._pause = False
                 if temp_count != self.count:
                     self._retargeting = False
                     break
