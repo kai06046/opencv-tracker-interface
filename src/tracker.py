@@ -24,10 +24,10 @@ from tkinter.filedialog import askopenfilename
 from tkinter.messagebox import askyesno, askokcancel, showerror, showwarning, showinfo
 
 # for deep learning model
-import tensorflow as tf
-from keras.models import load_model
+# import tensorflow as tf
+# from keras.models import load_model
 
-args = {'model_name': 'nadam_resnet_first_3_freeze_3', 'frame_ind': 1, 'run_model': True, 'save_pos': False}
+args = {'model_name': 'nadam_resnet_first_3_freeze_3', 'frame_ind': 1, 'run_model': False, 'save_pos': False}
 
 # basic variables
 WINDOW_NAME = 'Burying Beetle Tracker'
@@ -73,7 +73,7 @@ class Tracker(KeyHandler, Interface, BeetleDetector, MotionDetector, RatDetector
         self._n_pass_frame = 0
         
         # setup tracker
-        self.tracker = cv2.MultiTracker(self.track_alg)
+        self.tracker = cv2.MultiTracker_create()
         
         # different mode while tracking
         self._add_box = True # flag of add bounding box mode
@@ -105,7 +105,8 @@ class Tracker(KeyHandler, Interface, BeetleDetector, MotionDetector, RatDetector
         self._run_model = args['run_model']
         self._update = False
         # load model data or weight
-        self._model = load_model('model/%s.h5' % args['model_name'])
+        if args['run_model']:
+            self._model = load_model('model/%s.h5' % args['model_name'])
         
         self._stop_obj = None
         self._is_stop = None

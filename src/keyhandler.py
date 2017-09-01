@@ -154,10 +154,10 @@ class BasicOperation(object):
 
     # initialize multi tracker
     def _initialize_tracker(self):
-        self.tracker = cv2.MultiTracker(self.track_alg)
+        self.tracker = cv2.MultiTracker_create()
         if len(self._bboxes) > 0:
             try:
-                self.tracker.add(self.frame, tuple(self._bboxes))
+                self.tracker.add(cv2.TrackerMIL_create(), self.frame, tuple(self._bboxes))
             except Exception as e:
                 print(e)
                 print(tuple(self._bboxes))
@@ -378,7 +378,7 @@ class KeyHandler(BasicOperation):
                     self._roi_pts = []
                     if len(self.object_name) == self._len_bbox + 1:
                         self._bboxes = [(r[0][0], r[0][1], r[1][0] - r[0][0], r[1][1] - r[0][1]) for r in self._init_bbox]
-                        ok = self.tracker.add(self.frame, self._bboxes[self._len_bbox]) # adding new bounding box
+                        ok = self.tracker.add(cv2.TrackerMIL_create(), self.frame, self._bboxes[self._len_bbox]) # adding new bounding box
                         self._len_bbox += 1
                     
                 # break the loop if SPACE was pressed

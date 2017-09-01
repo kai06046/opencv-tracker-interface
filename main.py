@@ -12,7 +12,7 @@ import cv2
 import time
 import pickle
 
-from keras.models import load_model
+# from keras.models import load_model
 
 from src.common import *
 
