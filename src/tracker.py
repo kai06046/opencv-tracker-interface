@@ -112,7 +112,7 @@ class Tracker(KeyHandler, Interface, BeetleDetector, MotionDetector, RatDetector
         self._is_stop = None
 
         # background subtractor model, for adding potential bounding box
-        self._run_motion = True
+        self._run_motion = False
         self._bs = cv2.createBackgroundSubtractorMOG2()
         self._pot_rect =  []
 
