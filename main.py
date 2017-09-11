@@ -16,7 +16,7 @@ import pickle
 
 from src.common import *
 
-args = {'frame_ind': 1, 'run_model': True, 'save_pos': False}
+args = {'frame_ind': 1, 'run_model': False, 'save_pos': False}
 RESIZE = (224, 224)
 TRACK_ALGORITHM = 'BOOSTING' # Other alternatives are BOOSTING, KCF, TLD, MEDIANFLOW 
 N_MAX = 20 # max number of trying to relocate the target object
@@ -54,7 +54,7 @@ def main(track_alg):
     ok, frame = video.read()
     
     # setup up the window and mouse callback
-    cv2.namedWindow(beetle_tracker.window_name, cv2.WINDOW_AUTOSIZE)
+    cv2.namedWindow(beetle_tracker.window_name, cv2.WINDOW_KEEPRATIO)
     cv2.setMouseCallback(beetle_tracker.window_name, beetle_tracker._mouse_ops)
     while True:
         # Read a new frame and wait for a keypress

@@ -12,8 +12,10 @@ KEY_RETARGET = ord('r')
 KEY_MODEL = ord('m')
 KEY_MOTION = ord('b')
 KEY_UPDATE = ord('u')
-KEY_LEFT = 2424832 # might different for different machine
-KEY_RIGHT = 2555904
+# KEY_LEFT = 2424832 # might different for different machine
+# KEY_RIGHT = 2555904
+KEY_LEFT = ord('x') # might different for different machine
+KEY_RIGHT = ord('c')
 KEY_JUMP = ord('j')
 KEY_HELP = ord('h')
 KEY_RAT = ord('z')
@@ -157,9 +159,10 @@ class BasicOperation(object):
         self.tracker = cv2.MultiTracker_create()
         if len(self._bboxes) > 0:
             try:
-                self.tracker.add(cv2.TrackerMIL_create(), self.frame, tuple(self._bboxes))
+                for b in self._bboxes:
+                    self.tracker.add(cv2.TrackerMIL_create(), self.frame, tuple(b))
             except Exception as e:
-                print(e)
+                print("_initialize_tracker", e)
                 print(tuple(self._bboxes))
 
     # append meta data of tracking
